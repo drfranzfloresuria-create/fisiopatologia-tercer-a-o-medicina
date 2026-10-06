@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Génesis de la Ateroesclerosis y Transición Endotelio-Mesenquimal</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --blood: #ffcccc;
+            --glycocalyx: #74b9ff;
+            --endo: #55efc4;
+            --endo-border: #00b894;
+            --intima: #ffeaa7;
+            --ldl: #f1c40f;
+            --mesenchymal: #a29bfe;
+            --danger: #e74c3c;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        .controls {
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        label { font-weight: bold; margin-bottom: 15px; color: var(--primary); font-size: 16px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; border-radius: 4px; outline: none; }
+        .timeline-markers { display: flex; justify-content: space-between; font-size: 11px; color: #7f8fa6; margin-top: 10px; font-weight: bold;}
+        
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative;
+            height: 350px;
+            background-color: var(--blood);
+            border-radius: 8px;
+            border: 2px solid #dfe6e9;
+            overflow: hidden;
+            margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Flujo Sanguíneo Superior */
+        .lumen {
+            flex: 2;
+            position: relative;
+            z-index: 10;
+        }
+        .flow-particle {
+            position: absolute;
+            background-color: rgba(231, 76, 60, 0.7);
+        }
+
+        /* Glicocálix */
+        .glycocalyx-layer {
+            height: 15px;
+            background: repeating-linear-gradient(90deg, transparent, transparent 2px, var(--glycocalyx) 2px, var(--glycocalyx) 4px);
+            width: 100%;
+            transition: all 0.5s ease;
+            opacity: 1;
+        }
+
+        /* Endotelio */
+        .endothelium-layer {
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            background-color: #ff7f50;
+            padding-bottom: 3px;
+            transition: gap 0.5s ease;
+            z-index: 5;
+        }
+        .endo-cell {
+            width: 18%;
+            height: 100%;
+            background-color: var(--endo);
+            border: 2px solid var(--endo-border);
+            border-radius: 4px 4px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.8s ease;
+            position: relative;
+        }
+        .nucleus { width: 20px; height: 10px; background-color: #2d3436; border-radius: 50%; transition: all 0.5s ease; }
+
+        /* Célula mutante para EndMT */
+        #target-cell {
+            z-index: 20;
+        }
+        .endmt-active {
+            transform: translateY(80px) scale(0.8) rotate(15deg);
+            background-color: var(--mesenchymal) !important;
+            border-color: #6c5ce7 !important;
+            border-radius: 50% !important;
+        }
+
+        /* Íntima (Subendotelio) */
+        .intima-layer {
+            flex: 3;
+            background: repeating-linear-gradient(0deg, #ffeaa7, #ffeaa7 10px, #fdcb6e 10px, #fdcb6e 11px);
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Partículas LDL */
+        .ldl {
+            position: absolute;
+            width: 14px; height: 14px;
+            background-color: var(--ldl);
+            border-radius: 50%;
+            border: 2px solid #e67e22;
+            top: 20px;
+            opacity: 0;
+            transition: all 1s ease;
+            z-index: 2;
+        }
+
+        /* Radicales Libres (ROS) */
+        .ros {
+            position: absolute;
+            color: var(--danger);
+            font-weight: bold;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            animation: pulse 1s infinite;
+        }
+
+        /* Dashboards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ced6e0;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 16px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 4;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-left: 5px solid #3498db;
+            border-radius: 4px;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #2c3e50;
+            margin-top: 10px;
+        }
+
+        /* Corrección de Animaciones de Flujo */
+        @keyframes flowLaminar { 
+            0% { left: -50px; } 
+            100% { left: 100%; } 
+        }
+        @keyframes flowTurbulent {
+            0% { left: -50px; transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(15px) rotate(90deg); }
+            50% { transform: translateY(-10px) rotate(180deg); }
+            75% { transform: translateY(20px) rotate(270deg); }
+            100% { left: 100%; transform: translateY(0) rotate(360deg); }
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Génesis Aterogénica y Transición Endotelio-Mesenquimal</h1>
+        <p class="subtitle">Evolución desde el estrés físico/químico hasta la reprogramación celular</p>
+        
+        <div class="controls">
+            <label>
+                <span>Nivel de Agresión Sostenida (Flujo Oscilante + Estrés Químico)</span>
+                <span id="stage-percentage">0%</span>
+            </label>
+            <input type="range" id="agresion-slider" min="0" max="100" value="0" step="1">
+            <div class="timeline-markers">
+                <span>0%: Salud</span>
+                <span>25%: Daño Escudo</span>
+                <span>50%: Permeabilidad</span>
+                <span>75%: Infiltración</span>
+                <span>100%: EndMT</span>
+            </div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="lumen" id="lumen-zone">
+                <!-- Flujo y ROS generados por JS -->
+            </div>
+            
+            <div class="glycocalyx-layer" id="glycocalyx"></div>
+            
+            <div class="endothelium-layer" id="endothelium">
+                <div class="endo-cell"><div class="nucleus"></div></div>
+                <div class="endo-cell"><div class="nucleus"></div></div>
+                <div class="endo-cell" id="target-cell"><div class="nucleus"></div></div>
+                <div class="endo-cell"><div class="nucleus"></div></div>
+                <div class="endo-cell"><div class="nucleus"></div></div>
+            </div>
+            
+            <div class="intima-layer" id="intima">
+                <!-- LDL atrapado generado por JS -->
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card" id="card-glyco">
+                <div class="metric-title">Glicocálix</div>
+                <div class="metric-state" id="st-glyco" style="color: #2ecc71;">Intacto</div>
+            </div>
+            <div class="metric-card" id="card-barrier">
+                <div class="metric-title">Barrera Celular</div>
+                <div class="metric-val">Uniones: <span id="st-barrier" class="metric-state" style="color: #2ecc71;">Estrechas</span></div>
+            </div>
+            <div class="metric-card" id="card-ldl">
+                <div class="metric-title">Carga Intimal LDL</div>
+                <div class="metric-state" id="st-ldl">0 (Nula)</div>
+            </div>
+            <div class="metric-card" id="card-phenotype">
+                <div class="metric-title">Fenotipo Celular</div>
+                <div class="metric-state" id="st-phenotype">Endotelial Base</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>Estado Fisiológico:</strong> El flujo laminar genera tensión de cizallamiento alta y unidireccional. El glicocálix protege la membrana. El endotelio mantiene sus uniones estrechas y produce Óxido Nítrico.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slider = document.getElementById('agresion-slider');
+        const percentageText = document.getElementById('stage-percentage');
+        
+        const glycocalyx = document.getElementById('glycocalyx');
+        const endothelium = document.getElementById('endothelium');
+        const targetCell = document.getElementById('target-cell');
+        const lumenZone = document.getElementById('lumen-zone');
+        const intima = document.getElementById('intima');
+        
+        const stGlyco = document.getElementById('st-glyco');
+        const stBarrier = document.getElementById('st-barrier');
+        const stLdl = document.getElementById('st-ldl');
+        const stPhenotype = document.getElementById('st-phenotype');
+        const explanation = document.getElementById('explanation');
+
+        // Setup inicial del entorno
+        const flowParticles = [];
+        for(let i=0; i<10; i++) {
+            const p = document.createElement('div');
+            p.className = 'flow-particle';
+            p.style.top = Math.random() * 60 + 10 + '%';
+            p.style.animationDelay = (Math.random() * 2) + 's';
+            lumenZone.appendChild(p);
+            flowParticles.push(p);
+        }
+
+        const ldlParticles = [];
+        for(let i=0; i<15; i++) {
+            const ldl = document.createElement('div');
+            ldl.className = 'ldl';
+            ldl.style.left = (Math.random() * 80 + 10) + '%';
+            intima.appendChild(ldl);
+            ldlParticles.push({ el: ldl, activeThreshold: 50 + (Math.random() * 25) });
+        }
+
+        const rosParticles = [];
+        for(let i=0; i<6; i++) {
+            const ros = document.createElement('div');
+            ros.className = 'ros';
+            ros.innerHTML = 'O2?';
+            ros.style.left = (Math.random() * 80 + 10) + '%';
+            ros.style.bottom = '10px';
+            lumenZone.appendChild(ros);
+            rosParticles.push(ros);
+        }
+
+        function updateSimulation() {
+            const val = parseInt(slider.value);
+            percentageText.innerText = val + '%';
+
+            // 1. Degradación del Glicocálix
+            let glycoOpacity = 1 - (val / 40);
+            if (glycoOpacity < 0) glycoOpacity = 0;
+            glycocalyx.style.opacity = glycoOpacity;
+            glycocalyx.style.height = (15 * glycoOpacity) + 'px';
+
+            if (val < 20) {
+                stGlyco.innerText = "Intacto"; stGlyco.style.color = "#2ecc71";
+            } else if (val < 40) {
+                stGlyco.innerText = "Degradándose"; stGlyco.style.color = "#f39c12";
+            } else {
+                stGlyco.innerText = "Destruido"; stGlyco.style.color = "#e74c3c";
+            }
+
+            // Turbulencia del Flujo (Corregido para ir solo hacia adelante)
+            flowParticles.forEach(p => {
+                if (val > 20) {
+                    p.style.width = '12px'; p.style.height = '12px'; p.style.borderRadius = '50%';
+                    // La animación fluye hacia adelante pero con rebotes caóticos (Vórtices)
+                    p.style.animation = `flowTurbulent ${Math.random()*1.5 + 1.5}s linear infinite`; 
+                } else {
+                    p.style.width = '30px'; p.style.height = '4px'; p.style.borderRadius = '10px';
+                    // Flujo laminar en línea recta
+                    p.style.animation = `flowLaminar ${Math.random()*1 + 1.5}s linear infinite`; 
+                }
+            });
+
+            // Estrés Oxidativo
+            rosParticles.forEach(r => r.style.opacity = val > 30 ? 1 : 0);
+
+            // 2. Pérdida de Barrera
+            let gapSize = 2;
+            if (val > 40) {
+                gapSize = 2 + ((val - 40) / 3);
+                if(gapSize > 15) gapSize = 15;
+            }
+            endothelium.style.gap = gapSize + 'px';
+
+            if (val < 40) {
+                stBarrier.innerText = "Estrechas"; stBarrier.style.color = "#2ecc71";
+            } else {
+                stBarrier.innerText = "Rotas (Permeable)"; stBarrier.style.color = "#e74c3c";
+            }
+
+            // 3. Extravasación de LDL
+            let ldlCount = 0;
+            ldlParticles.forEach(ldl => {
+                if (val >= ldl.activeThreshold) {
+                    ldl.el.style.opacity = 1;
+                    ldl.el.style.top = (Math.random() * 60 + 20) + 'px';
+                    ldlCount++;
+                } else {
+                    ldl.el.style.opacity = 0;
+                    ldl.el.style.top = '-20px';
+                }
+            });
+            stLdl.innerText = ldlCount > 10 ? "Masiva (Estría)" : ldlCount + " retenidas";
+            stLdl.style.color = ldlCount > 10 ? "#e74c3c" : (ldlCount > 0 ? "#f39c12" : "#2ecc71");
+
+            // 4. Transición EndMT
+            if (val > 80) {
+                targetCell.classList.add('endmt-active');
+                stPhenotype.innerText = "Mesenquimal (Osteogénico)";
+                stPhenotype.style.color = "#8e44ad";
+            } else {
+                targetCell.classList.remove('endmt-active');
+                stPhenotype.innerText = val > 40 ? "Activado / Inflamado" : "Endotelial Base";
+                stPhenotype.style.color = val > 40 ? "#e74c3c" : "#2c3e50";
+            }
+
+            // Cuadro Fisiopatológico
+            if (val < 25) {
+                explanation.innerHTML = "<strong>Fase 1 - Salud:</strong> El flujo laminar genera tensión de cizallamiento alta y unidireccional. El glicocálix protege la membrana.";
+                explanation.style.borderLeftColor = "#3498db";
+            } else if (val < 50) {
+                explanation.innerHTML = "<strong>Fase 2 - Agresión:</strong> El flujo oscilante (remolinos) y el estrés químico degradan el glicocálix. Se genera estrés oxidativo (O2?).";
+                explanation.style.borderLeftColor = "#f1c40f";
+            } else if (val < 80) {
+                explanation.innerHTML = "<strong>Fase 3 - Disfunción y Estría:</strong> El endotelio pierde su morfología y rompe las uniones. El LDL ingresa masivamente al subendotelio.";
+                explanation.style.borderLeftColor = "#e67e22";
+            } else {
+                explanation.innerHTML = "<strong>Fase 4 - Transición EndMT:</strong> El ambiente hostil obliga a la célula endotelial a migrar a la placa y adoptar un fenotipo osteogénico.";
+                explanation.style.borderLeftColor = "#8e44ad";
+            }
+        }
+
+        slider.addEventListener('input', updateSimulation);
+        updateSimulation();
+    </script>
+</body>
+</html>

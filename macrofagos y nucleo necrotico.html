@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Cinética Celular y Formación del Núcleo Necrótico</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --lumen: #ffcccc;
+            --endo: #ff7f50;
+            --intima: #ffeaa7;
+            --ldl: #f1c40f;
+            --mldl: #e67e22;
+            --monocyte: #3498db;
+            --macrophage: #9b59b6;
+            --m1: #e74c3c;
+            --foam: #f39c12;
+            --core: #d35400;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 20px; font-size: 14px; }
+        
+        /* Controles */
+        .controls {
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        label { font-weight: bold; margin-bottom: 10px; color: var(--primary); font-size: 16px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; }
+        .timeline-markers { display: flex; justify-content: space-between; font-size: 11px; color: #7f8fa6; margin-top: 10px; font-weight: bold;}
+        
+        /* Área de Simulación */
+        .simulation-area {
+            position: relative;
+            height: 400px;
+            background-color: var(--intima);
+            border-radius: 8px;
+            border: 2px solid #dfe6e9;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 25px;
+        }
+        
+        /* 1. Lumen y Endotelio */
+        .lumen {
+            height: 80px;
+            background-color: var(--lumen);
+            position: relative;
+            z-index: 10;
+            border-bottom: 6px solid var(--endo);
+        }
+        .adhesion-molecules {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 6px;
+            background: repeating-linear-gradient(90deg, transparent, transparent 15px, #2980b9 15px, #2980b9 20px);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        /* 2. Células Dinámicas */
+        .cell {
+            position: absolute;
+            transition: all 1.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Monocitos en el Lumen */
+        .monocyte {
+            width: 20px; height: 20px;
+            background-color: var(--monocyte);
+            border-radius: 50%;
+            top: 20px;
+            z-index: 15;
+            box-shadow: inset -3px -3px 0 rgba(0,0,0,0.2);
+        }
+        .monocyte::after { content: "M"; font-size: 10px; color: white; font-weight: bold; }
+
+        /* Macrófagos en Íntima */
+        .macrophage {
+            width: 35px; height: 35px;
+            background-color: var(--macrophage);
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; /* Ameboide */
+            opacity: 0; /* Oculto inicialmente */
+            box-shadow: inset -4px -4px 0 rgba(0,0,0,0.2);
+        }
+        
+        /* Receptor Scavenger */
+        .scavenger {
+            position: absolute;
+            width: 45px; height: 45px;
+            border: 2px dashed #8e44ad;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.5s;
+            animation: spin 4s linear infinite;
+        }
+
+        /* Fenotipos */
+        .m1-phenotype {
+            background-color: var(--m1);
+            border-radius: 10px; /* Más rígido/agresivo */
+            transform: scale(1.1);
+        }
+        .m1-phenotype::after { content: "M1"; font-size: 12px; color: white; font-weight: bold; }
+        
+        .foam-phenotype {
+            background-color: var(--foam);
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.7) 30%, transparent 30%), radial-gradient(circle, rgba(255,255,255,0.7) 30%, transparent 30%);
+            background-size: 10px 10px;
+            background-position: 0 0, 5px 5px;
+        }
+
+        /* Animación de Muerte */
+        .apoptosis-burst {
+            animation: burst 1s forwards;
+        }
+
+        /* 3. Lípidos (LDL / mLDL) */
+        .lipid {
+            position: absolute;
+            width: 12px; height: 12px;
+            background-color: var(--ldl);
+            border-radius: 50%;
+            top: 40px;
+            opacity: 0;
+            transition: all 1s ease;
+            z-index: 5;
+        }
+        .lipid.oxidized {
+            background-color: var(--mldl);
+            box-shadow: 0 0 5px var(--danger);
+        }
+        .lipid.eaten {
+            opacity: 0 !important;
+            transform: scale(0);
+        }
+
+        /* 4. Núcleo Necrótico */
+        .necrotic-core {
+            position: absolute;
+            bottom: 0; width: 100%;
+            height: 0px;
+            background: linear-gradient(180deg, rgba(211,84,0,0.8) 0%, #a04000 100%);
+            border-top: 2px dashed #f39c12;
+            transition: height 1.5s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white; font-weight: bold; font-size: 14px; text-shadow: 1px 1px 2px black;
+            z-index: 20;
+        }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 15px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 4; padding: 15px; background-color: #e8f4f8;
+            border-left: 5px solid #3498db; border-radius: 4px; font-size: 14px;
+            line-height: 1.5; color: #2c3e50; margin-top: 10px;
+        }
+
+        /* Animaciones */
+        @keyframes flowRight { 0% { left: -20px; } 100% { left: 100%; } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes burst { 
+            0% { transform: scale(1); opacity: 1; } 
+            50% { transform: scale(1.5); background-color: var(--danger); } 
+            100% { transform: scale(2); opacity: 0; } 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Cinética Celular y Formación del Núcleo Necrótico</h1>
+        <p class="subtitle">Evolución desde la migración monocitaria hasta la toxicidad lipídica y muerte celular</p>
+        
+        <div class="controls">
+            <label>
+                <span>Progresión de la Lesión Ateromatosa</span>
+                <span id="stage-val">0%</span>
+            </label>
+            <input type="range" id="timeline-slider" min="0" max="100" value="0" step="5">
+            <div class="timeline-markers">
+                <span>0%: Salud</span>
+                <span>25%: Modificación LDL</span>
+                <span>50%: Fagocitosis (Scavenger)</span>
+                <span>75%: Fenotipos (M1 / Espumosas)</span>
+                <span>100%: Necrosis Secundaria</span>
+            </div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="lumen">
+                <div class="adhesion-molecules" id="vcam"></div>
+                <!-- Monocitos circulantes -->
+                <div class="cell monocyte" id="mono1" style="left: 20%;"></div>
+                <div class="cell monocyte" id="mono2" style="left: 50%;"></div>
+                <div class="cell monocyte" id="mono3" style="left: 80%;"></div>
+            </div>
+
+            <!-- Lípidos -->
+            <div id="lipid-layer">
+                <div class="lipid" id="ldl1" style="left: 25%;"></div>
+                <div class="lipid" id="ldl2" style="left: 45%;"></div>
+                <div class="lipid" id="ldl3" style="left: 55%;"></div>
+                <div class="lipid" id="ldl4" style="left: 75%;"></div>
+                <div class="lipid" id="ldl5" style="left: 85%;"></div>
+            </div>
+
+            <!-- Macrófagos (En la íntima) -->
+            <div class="cell macrophage" id="mac1" style="left: 22%; top: 180px;">
+                <div class="scavenger"></div>
+            </div>
+            <div class="cell macrophage" id="mac2" style="left: 52%; top: 200px;">
+                <div class="scavenger"></div>
+            </div>
+            <div class="cell macrophage" id="mac3" style="left: 78%; top: 160px;">
+                <div class="scavenger"></div>
+            </div>
+
+            <!-- Núcleo Necrótico -->
+            <div class="necrotic-core" id="n-core">Núcleo Necrótico (Detritos Lipídicos y Celulares)</div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Estado del LDL</div>
+                <div class="metric-state" id="st-ldl">Circulante</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Monocitos / Macrófagos</div>
+                <div class="metric-state" id="st-cells">En Torrente Sanguíneo</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Actividad Scavenger</div>
+                <div class="metric-state" id="st-receptor">Inactiva</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Estado de la Placa</div>
+                <div class="metric-state" id="st-core" style="color: #2ecc71;">Sana</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>Estado Inicial:</strong> Monocitos patrullan el torrente sanguíneo. El LDL circula normalmente sin atravesar la barrera endotelial.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slider = document.getElementById('timeline-slider');
+        
+        // Elementos
+        const vcam = document.getElementById('vcam');
+        const monos = [document.getElementById('mono1'), document.getElementById('mono2'), document.getElementById('mono3')];
+        const macs = [document.getElementById('mac1'), document.getElementById('mac2'), document.getElementById('mac3')];
+        const scavengers = document.querySelectorAll('.scavenger');
+        const ldls = [document.getElementById('ldl1'), document.getElementById('ldl2'), document.getElementById('ldl3'), document.getElementById('ldl4'), document.getElementById('ldl5')];
+        const nCore = document.getElementById('n-core');
+
+        // Textos
+        const stLdl = document.getElementById('st-ldl');
+        const stCells = document.getElementById('st-cells');
+        const stReceptor = document.getElementById('st-receptor');
+        const stCore = document.getElementById('st-core');
+        const explanation = document.getElementById('explanation');
+
+        function updateSimulation() {
+            const val = parseInt(slider.value);
+            document.getElementById('stage-val').innerText = val + '%';
+
+            // Reset general
+            macs.forEach(m => m.classList.remove('m1-phenotype', 'foam-phenotype', 'apoptosis-burst'));
+            
+            // FASE 1 (0-20): Ingreso y Modificación de LDL
+            if (val >= 10) {
+                ldls.forEach(l => {
+                    l.style.opacity = 1;
+                    l.style.top = (Math.random() * 50 + 120) + 'px'; // Caen a la íntima
+                    l.classList.remove('eaten');
+                });
+                stLdl.innerText = "Ingreso a Íntima";
+            } else {
+                ldls.forEach(l => { l.style.opacity = 0; l.style.top = '40px'; });
+                stLdl.innerText = "Circulante";
+            }
+
+            if (val >= 20) {
+                ldls.forEach(l => l.classList.add('oxidized'));
+                stLdl.innerText = "Oxidado (mLDL)";
+                stLdl.style.color = "#e67e22";
+            } else {
+                ldls.forEach(l => l.classList.remove('oxidized'));
+                stLdl.style.color = "#2c3e50";
+            }
+
+            // FASE 2 (20-40): Reclutamiento y Diapédesis
+            if (val >= 25) {
+                vcam.style.opacity = 1; // Expresión de VCAM-1 / ICAM-1
+                monos.forEach(m => { m.style.top = '55px'; m.style.opacity = 1; }); // Se adhieren
+                stCells.innerText = "Adhesión (VCAM-1)";
+            } else {
+                vcam.style.opacity = 0;
+                monos.forEach(m => { m.style.top = '20px'; m.style.opacity = 1; });
+                stCells.innerText = "En Torrente Sanguíneo";
+            }
+
+            if (val >= 35) {
+                monos.forEach(m => m.style.opacity = 0); // Desaparecen del lumen (diapédesis)
+                macs.forEach(m => m.style.opacity = 1); // Aparecen como macrófagos
+                stCells.innerText = "Migración y Diferenciación";
+            } else {
+                macs.forEach(m => m.style.opacity = 0);
+            }
+
+            // FASE 3 (40-60): Receptores Scavenger y Fagocitosis
+            if (val >= 45) {
+                scavengers.forEach(s => s.style.opacity = 1);
+                stReceptor.innerText = "Expresados (Sin límite)";
+                stReceptor.style.color = "#8e44ad";
+            } else {
+                scavengers.forEach(s => s.style.opacity = 0);
+                stReceptor.innerText = "Inactivos";
+                stReceptor.style.color = "#2c3e50";
+            }
+
+            if (val >= 55) {
+                ldls.forEach(l => l.classList.add('eaten')); // Desaparecen (fagocitados)
+                stLdl.innerText = "Fagocitado";
+            }
+
+            // FASE 4 (60-80): Fenotipos (M1 e Espumosas)
+            if (val >= 65) {
+                macs[0].classList.add('m1-phenotype'); // M1 Inflamatorio
+                macs[1].classList.add('foam-phenotype'); // Espumosa
+                macs[2].classList.add('foam-phenotype'); // Espumosa
+                stCells.innerText = "Fenotipos M1 y Espumosa";
+                stCells.style.color = "#f39c12";
+            } else {
+                stCells.style.color = "#2c3e50";
+            }
+
+            // FASE 5 (80-100): Necrosis y Núcleo
+            if (val >= 85) {
+                macs[1].classList.add('apoptosis-burst');
+                macs[2].classList.add('apoptosis-burst');
+                stCells.innerText = "Necrosis Celular";
+                stCells.style.color = "#c0392b";
+                
+                nCore.style.height = '60px'; // Crece el núcleo
+                stCore.innerText = "Núcleo Necrótico Expandido";
+                stCore.style.color = "#c0392b";
+            } else {
+                nCore.style.height = '0px';
+                stCore.innerText = val > 40 ? "Placa en Crecimiento" : "Sana";
+                stCore.style.color = val > 40 ? "#f39c12" : "#2ecc71";
+            }
+
+            // Cuadro Fisiopatológico Explicativo
+            if (val < 20) {
+                explanation.innerHTML = "<strong>1. Ingreso y Modificación:</strong> El aumento de permeabilidad endotelial permite el ingreso de LDL a la íntima, donde sufre oxidación (mLDL) por especies reactivas de oxígeno.";
+                explanation.style.borderLeftColor = "#3498db";
+            } else if (val < 40) {
+                explanation.innerHTML = "<strong>2. Reclutamiento y Diapédesis:</strong> El mLDL induce la expresión de moléculas de adhesión (VCAM-1). Los monocitos se adhieren, migran al subendotelio y se diferencian en macrófagos.";
+                explanation.style.borderLeftColor = "#2980b9";
+            } else if (val < 60) {
+                explanation.innerHTML = "<strong>3. Receptores Scavenger y Fagocitosis:</strong> A diferencia de los receptores clásicos, los receptores <em>scavenger</em> evaden la retroalimentación negativa, permitiendo la ingurgitación ilimitada de lípidos oxidados.";
+                explanation.style.borderLeftColor = "#8e44ad";
+            } else if (val < 80) {
+                explanation.innerHTML = "<strong>4. Diferenciación Fenotípica:</strong> La carga lipídica transforma a los macrófagos. Algunos adoptan un fenotipo M1 (proinflamatorio clásico), mientras que otros se ingurgitan de colesterol transformándose en <strong>Células Espumosas</strong>.";
+                explanation.style.borderLeftColor = "#f39c12";
+            } else {
+                explanation.innerHTML = "<strong>5. Toxicidad, Necrosis y Núcleo Necrótico:</strong> La absorción sin límite de lípidos causa estrés tóxico. Ante la falla de la eferocitosis (aclaramiento), las células espumosas sufren apoptosis o <strong>necrosis secundaria</strong>, derramando detritos y lípidos que expanden el <strong>núcleo necrótico</strong>, volviendo la placa vulnerable[cite: 2].";
+                explanation.style.borderLeftColor = "#c0392b";
+            }
+        }
+
+        slider.addEventListener('input', updateSimulation);
+        updateSimulation();
+    </script>
+</body>
+</html>

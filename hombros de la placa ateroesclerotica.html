@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Vulnerabilidad Asimétrica en Codos de la Placa</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --blood: #ffcccc;
+            --plaque: #f1c40f;
+            --fibrous-cap: #bdc3c7;
+            --healthy-wall: #e67e22;
+            --endo-cell: #2ecc71;
+            --macrophage: #9b59b6;
+            --red-thrombus: #c0392b;
+            --white-thrombus: #dfe6e9;
+            --flow-force: #c0392b;
+            --vortex: #3498db;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+        .container {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px; width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        /* Selector de Codo */
+        .mechanism-selector {
+            display: flex; justify-content: center; gap: 20px; margin-bottom: 25px;
+        }
+        .btn-mech {
+            padding: 12px 25px; font-size: 16px; font-weight: bold; border: 2px solid #ced6e0;
+            background-color: white; color: #7f8fa6; border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-mech.active-proximal { background-color: #c0392b; color: white; border-color: #922b21; }
+        .btn-mech.active-distal { background-color: #2980b9; color: white; border-color: #1a5276; }
+
+        /* Controles */
+        .controls { background: #f1f2f6; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
+        label { font-weight: bold; margin-bottom: 10px; color: var(--primary); font-size: 16px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; }
+
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative; height: 300px; background-color: var(--blood); border-radius: 8px;
+            border: 2px solid #dfe6e9; overflow: hidden; margin-bottom: 25px;
+        }
+        
+        /* Pared Sana (Izquierda y Derecha) */
+        .healthy-intima {
+            position: absolute; bottom: 0; width: 100%; height: 30px;
+            background-color: var(--healthy-wall); z-index: 2; border-top: 2px solid #d35400;
+        }
+        .endothelium-layer {
+            position: absolute; bottom: 30px; width: 100%; height: 8px;
+            display: flex; gap: 1px; z-index: 6;
+        }
+        .healthy-endo-cell {
+            width: 25px; height: 100%; background-color: var(--endo-cell); border-radius: 2px; transition: opacity 0.3s;
+        }
+
+        /* Placa Ateromatosa Central */
+        .plaque-mound {
+            position: absolute; bottom: 30px; left: 25%; width: 50%; height: 130px;
+            background: radial-gradient(ellipse at bottom, #d35400 0%, var(--plaque) 100%);
+            border-radius: 40% 50% 0 0; z-index: 3; transition: all 0.3s;
+        }
+        .fibrous-cap {
+            position: absolute; top: -4px; left: 0; width: 100%; height: 100%;
+            border-top: 4px solid var(--fibrous-cap); border-radius: 40% 50% 0 0; z-index: 4; transition: all 0.3s;
+        }
+
+        /* Marcadores de Codos */
+        .marker-prox { position: absolute; bottom: 50px; left: 22%; display: flex; flex-direction: column; align-items: center; z-index: 10; opacity: 0.5;}
+        .marker-dist { position: absolute; bottom: 50px; left: 68%; display: flex; flex-direction: column; align-items: center; z-index: 10; opacity: 0.5;}
+        .marker-arrow { width: 2px; height: 30px; background-color: #2c3e50; margin-bottom: 5px; }
+        .marker-text { background: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+
+        /* FLUJO Y FUERZAS FÍSICAS */
+        .flow-particle {
+            position: absolute; width: 15px; height: 4px; background-color: rgba(192, 57, 43, 0.7);
+            border-radius: 5px; z-index: 2;
+        }
+        
+        /* Codo Proximal (Fuerza Física) */
+        .physical-force {
+            position: absolute; left: 10%; top: 40%; width: 60px; height: 30px;
+            opacity: 0; z-index: 10; display: flex; align-items: center; transition: opacity 0.3s;
+        }
+        .force-arrow-body { width: 40px; height: 6px; background-color: var(--flow-force); }
+        .force-arrow-head { width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 15px solid var(--flow-force); }
+        
+        .macrophage-infiltrate {
+            position: absolute; bottom: 10px; left: 5px; width: 50px; height: 40px;
+            background: radial-gradient(circle, rgba(155, 89, 182, 0.8) 0%, transparent 70%); opacity: 0; z-index: 5; transition: opacity 0.3s;
+        }
+        .fissure {
+            position: absolute; top: 60px; left: 5px; width: 30px; height: 4px;
+            background-color: #c0392b; transform: rotate(45deg); opacity: 0; z-index: 6;
+        }
+        .red-thrombus {
+            position: absolute; top: 30px; left: -10px; width: 50px; height: 40px;
+            background-color: var(--red-thrombus); border-radius: 40% 60% 70% 30%;
+            box-shadow: 0 0 15px rgba(192, 57, 43, 0.8); opacity: 0; z-index: 15;
+        }
+
+        /* Codo Distal (Mecánica de Fluidos) */
+        .vortex-zone {
+            position: absolute; left: 75%; top: 40%; width: 60px; height: 60px;
+            opacity: 0; z-index: 10; transition: opacity 0.3s;
+        }
+        .vortex-spin {
+            width: 100%; height: 100%; border: 3px dashed var(--vortex); border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+        }
+        
+        .erosion-zone {
+            position: absolute; top: 20px; right: 10px; width: 50px; height: 10px;
+            opacity: 0; z-index: 7; display: flex; justify-content: center;
+        }
+        .net-traps {
+            position: absolute; top: -15px; width: 100%; height: 20px;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(52, 152, 219, 0.5) 5px, rgba(52, 152, 219, 0.5) 7px);
+        }
+        .white-thrombus {
+            position: absolute; top: -25px; width: 40px; height: 20px;
+            background-color: var(--white-thrombus); border-radius: 20px;
+            border: 1px solid #b2bec3; box-shadow: 0 0 10px rgba(236, 240, 241, 0.8); opacity: 0; z-index: 15;
+        }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 16px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 3; padding: 15px; background-color: #e8f4f8;
+            border-left: 5px solid #3498db; border-radius: 4px; font-size: 14px;
+            line-height: 1.5; color: #2c3e50; margin-top: 10px; min-height: 60px;
+        }
+
+        @keyframes throb { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes linearFlow { 0% { left: -5%; } 100% { left: 100%; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Vulnerabilidad en los Codos de la Placa</h1>
+        <p class="subtitle">Interacción entre endotelio sano y lesión: Fuerzas Físicas vs. Mecánica de Fluidos</p>
+        
+        <div class="mechanism-selector">
+            <button class="btn-mech active-proximal" id="btn-prox" onclick="setCodo('proximal')">Codo Proximal (Impacto Físico)</button>
+            <button class="btn-mech" id="btn-dist" onclick="setCodo('distal')">Codo Distal (Mecánica de Fluidos)</button>
+        </div>
+
+        <div class="controls">
+            <label>
+                <span id="slider-label">Fuerza Radial (Impacto) e Infiltración de Macrófagos</span>
+                <span id="stage-val">0%</span>
+            </label>
+            <input type="range" id="damage-slider" min="0" max="100" value="0" step="5">
+        </div>
+
+        <div class="simulation-area" id="sim-area">
+            <div class="healthy-intima"></div>
+            
+            <div class="endothelium-layer" id="endothelium">
+                <!-- Células generadas por JS -->
+            </div>
+
+            <!-- Marcadores -->
+            <div class="marker-prox" id="mark-p">
+                <div class="marker-text">Codo Proximal</div>
+                <div class="marker-arrow"></div>
+            </div>
+            <div class="marker-dist" id="mark-d">
+                <div class="marker-text">Codo Distal</div>
+                <div class="marker-arrow"></div>
+            </div>
+
+            <div class="plaque-mound" id="plaque">
+                <div class="fibrous-cap" id="fibrous-cap"></div>
+                
+                <!-- Ruptura Proximal -->
+                <div class="macrophage-infiltrate" id="macrophages"></div>
+                <div class="fissure" id="fissure"></div>
+                <div class="red-thrombus" id="red-thrombus"></div>
+
+                <!-- Erosión Distal -->
+                <div class="erosion-zone" id="erosion-zone">
+                    <div class="net-traps" id="nets"></div>
+                    <div class="white-thrombus" id="white-thrombus"></div>
+                </div>
+            </div>
+            
+            <!-- Fuerzas -->
+            <div class="physical-force" id="phys-force">
+                <div class="force-arrow-body"></div>
+                <div class="force-arrow-head"></div>
+            </div>
+            <div class="vortex-zone" id="vortex-zone">
+                <div class="vortex-spin"></div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Fuerza Predominante</div>
+                <div class="metric-state" id="st-force">Presión Transmural</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Estado Biológico en el Codo</div>
+                <div class="metric-state" id="st-bio" style="color: #2ecc71;">Matriz Intacta</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Consecuencia Clínica</div>
+                <div class="metric-state" id="st-clinic" style="color: #2ecc71;">Sin Trombo</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>El Codo Proximal:</strong> Es la región de acodamiento donde la placa colinda con el tejido sano de entrada. Recibe el choque directo del flujo.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCodo = 'proximal';
+        const slider = document.getElementById('damage-slider');
+        const simArea = document.getElementById('sim-area');
+        
+        // Elementos visuales
+        const endothelium = document.getElementById('endothelium');
+        const fibrousCap = document.getElementById('fibrous-cap');
+        const markP = document.getElementById('mark-p');
+        const markD = document.getElementById('mark-d');
+        
+        // Proximal
+        const physForce = document.getElementById('phys-force');
+        const macrophages = document.getElementById('macrophages');
+        const fissure = document.getElementById('fissure');
+        const redThrombus = document.getElementById('red-thrombus');
+        
+        // Distal
+        const vortexZone = document.getElementById('vortex-zone');
+        const erosionZone = document.getElementById('erosion-zone');
+        const whiteThrombus = document.getElementById('white-thrombus');
+
+        // Textos
+        const stForce = document.getElementById('st-force');
+        const stBio = document.getElementById('st-bio');
+        const stClinic = document.getElementById('st-clinic');
+        const explanation = document.getElementById('explanation');
+        const sliderLabel = document.getElementById('slider-label');
+
+        // Generar endotelio (~40 células)
+        for(let i=0; i<40; i++) {
+            endothelium.innerHTML += `<div class="healthy-endo-cell" id="endo-${i}"></div>`;
+        }
+
+        // Generar partículas de sangre base
+        const particles = [];
+        for(let i=0; i<15; i++) {
+            const p = document.createElement('div');
+            p.className = 'flow-particle';
+            p.style.top = (Math.random() * 60 + 10) + '%';
+            p.style.animation = `linearFlow ${Math.random() * 1 + 2}s linear infinite`;
+            simArea.appendChild(p);
+            particles.push(p);
+        }
+
+        function setCodo(codo) {
+            currentCodo = codo;
+            slider.value = 0; 
+            
+            const btnProx = document.getElementById('btn-prox');
+            const btnDist = document.getElementById('btn-dist');
+
+            if (codo === 'proximal') {
+                btnProx.className = 'btn-mech active-proximal';
+                btnDist.className = 'btn-mech';
+                sliderLabel.innerText = "Fuerza Radial (Impacto Físico) e Infiltración Macrófagos";
+                stForce.innerText = "Presión Transmural";
+                
+                markP.style.opacity = 1; markD.style.opacity = 0.3;
+                fibrousCap.style.borderTopWidth = "4px";
+            } else {
+                btnProx.className = 'btn-mech';
+                btnDist.className = 'btn-mech active-distal';
+                sliderLabel.innerText = "Perturbación del Flujo (Cizallamiento Oscilatorio)";
+                stForce.innerText = "Mecánica de Fluidos";
+                
+                markP.style.opacity = 0.3; markD.style.opacity = 1;
+                fibrousCap.style.borderTopWidth = "8px"; // La erosión ocurre más en placas gruesas
+            }
+            
+            updateSimulation();
+        }
+
+        function updateSimulation() {
+            const val = parseInt(slider.value);
+            document.getElementById('stage-val').innerText = val + '%';
+
+            // Restaurar endotelio
+            for(let i=0; i<40; i++) {
+                document.getElementById(`endo-${i}`).style.opacity = 1;
+            }
+
+            if (currentCodo === 'proximal') {
+                // Ocultar Distal
+                vortexZone.style.opacity = 0;
+                erosionZone.style.opacity = 0;
+                whiteThrombus.style.opacity = 0;
+                whiteThrombus.style.animation = 'none';
+
+                // Lógica Proximal
+                physForce.style.opacity = val > 10 ? val/100 : 0;
+                macrophages.style.opacity = val / 100;
+                
+                if (val < 40) {
+                    fibrousCap.style.borderTopWidth = '4px';
+                    fissure.style.opacity = 0;
+                    redThrombus.style.opacity = 0;
+                    redThrombus.style.animation = 'none';
+                    
+                    stBio.innerText = "Matriz Intacta"; stBio.style.color = "#2ecc71";
+                    stClinic.innerText = "Sin Trombo"; stClinic.style.color = "#2ecc71";
+                    explanation.innerHTML = "<strong>Acodamiento Físico (Codo Proximal):</strong> Es el punto de choque hemodinámico. La fuerza de cizallamiento normal se pierde y la pared recibe la fuerza radial estresante P.";
+                } else if (val < 85) {
+                    fibrousCap.style.borderTopWidth = '1px'; 
+                    fissure.style.opacity = 0;
+                    redThrombus.style.opacity = 0;
+                    
+                    stBio.innerText = "Cápsula Debilitada"; stBio.style.color = "#f39c12";
+                    stClinic.innerText = "Vulnerable"; stClinic.style.color = "#f39c12";
+                    explanation.innerHTML = "<strong>Fuerza Física + Degradación:</strong> Los macrófagos infiltran este codo proximal secretando metaloproteinasas. Disuelven la matriz intersticial, dejando la zona inerme ante los picos de presión.";
+                } else {
+                    fibrousCap.style.borderTopWidth = '0px';
+                    fissure.style.opacity = 1;
+                    redThrombus.style.opacity = 1;
+                    redThrombus.style.animation = 'throb 0.5s infinite';
+                    
+                    stBio.innerText = "Fractura por Tensión"; stBio.style.color = "#c0392b";
+                    stClinic.innerText = "TROMBO ROJO"; stClinic.style.color = "#c0392b";
+                    explanation.innerHTML = "<strong>Ruptura Plena:</strong> La interacción entre la fuerza hidráulica y la debilidad biológica rasga la red de colágeno. Se libera el núcleo trombogénico formando un <strong>Trombo Rojo</strong>[cite: 2].";
+                }
+
+            } else {
+                // Ocultar Proximal
+                physForce.style.opacity = 0;
+                macrophages.style.opacity = 0;
+                fissure.style.opacity = 0;
+                redThrombus.style.opacity = 0;
+                redThrombus.style.animation = 'none';
+
+                // Lógica Distal
+                vortexZone.style.opacity = val > 10 ? val/100 : 0;
+                
+                if (val < 40) {
+                    erosionZone.style.opacity = 0;
+                    whiteThrombus.style.opacity = 0;
+                    whiteThrombus.style.animation = 'none';
+                    
+                    stBio.innerText = "Endotelio Contínuo"; stBio.style.color = "#2ecc71";
+                    stClinic.innerText = "Sin Trombo"; stClinic.style.color = "#2ecc71";
+                    explanation.innerHTML = "<strong>Acodamiento de Salida (Codo Distal):</strong> Aquí la placa desciende hacia el endotelio sano. Si el flujo es laminar, las fuerzas de cizallamiento protegen la integridad de las uniones[cite: 2].";
+                } else if (val < 85) {
+                    erosionZone.style.opacity = 1;
+                    whiteThrombus.style.opacity = 0;
+                    // Desaparecen células en la pendiente distal (aprox 26-28)
+                    for(let i=26; i<=28; i++) document.getElementById(`endo-${i}`).style.opacity = 0;
+                    
+                    stBio.innerText = "Apoptosis y NETs"; stBio.style.color = "#8e44ad";
+                    stClinic.innerText = "Activación Plaqueta"; stClinic.style.color = "#8e44ad";
+                    explanation.innerHTML = "<strong>Mecánica de Fluidos y Vórtices:</strong> Al salir de la estrechez, el flujo colapsa generando <strong>cizallamiento oscilatorio</strong>. Este estrés induce apoptosis en las células endoteliales del codo distal y la formación de trampas NETs por inmunidad innata[cite: 2].";
+                } else {
+                    erosionZone.style.opacity = 1;
+                    whiteThrombus.style.opacity = 1;
+                    whiteThrombus.style.animation = 'throb 0.5s infinite';
+                    for(let i=26; i<=28; i++) document.getElementById(`endo-${i}`).style.opacity = 0;
+                    
+                    stBio.innerText = "Denudación Superficial"; stBio.style.color = "#c0392b";
+                    stClinic.innerText = "TROMBO BLANCO"; stClinic.style.color = "#c0392b";
+                    explanation.innerHTML = "<strong>Erosión Plena:</strong> A diferencia de la ruptura física, aquí la dinámica de fluidos erosionó el endotelio dejando la membrana expuesta. Se forma rápidamente un <strong>Trombo Blanco</strong> rico en plaquetas sobre una cápsula que sigue intacta[cite: 2].";
+                }
+            }
+        }
+
+        slider.addEventListener('input', updateSimulation);
+        setCodo('proximal'); // Iniciar
+    </script>
+</body>
+</html>

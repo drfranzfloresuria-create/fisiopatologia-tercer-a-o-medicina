@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Efecto Bernoulli y Colapso Post-Estenótico</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --danger: #c0392b;
+            --warning: #f39c12;
+            --kinetic: #e67e22;
+            --pressure: #3498db;
+            --vessel-wall: #bdc3c7;
+            --plaque: #f1c40f;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 900px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 20px; font-size: 14px; }
+        
+        /* Controles */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .slider-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 13px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative;
+            height: 220px;
+            background-color: #ffeaa7;
+            border-top: 15px solid var(--vessel-wall);
+            border-bottom: 15px solid var(--vessel-wall);
+            border-radius: 4px;
+            margin-bottom: 25px;
+            overflow: visible; /* Permitir ver los vectores que salen */
+        }
+        
+        /* Placa Ateromatosa Excéntrica (Ubicada a la izquierda) */
+        .plaque {
+            position: absolute;
+            top: 0;
+            left: 20%;
+            width: 35%;
+            height: 20px;
+            background: linear-gradient(180deg, #d35400 0%, var(--plaque) 100%);
+            border-radius: 0 0 70% 30%; /* Caída asimétrica */
+            box-shadow: 2px 5px 15px rgba(0,0,0,0.3);
+            transition: height 0.3s ease;
+            z-index: 10;
+        }
+
+        /* Pared Frágil Post-Estenótica (Al salir de la placa) */
+        .fragile-wall {
+            position: absolute;
+            top: -15px; /* Cubre el borde superior */
+            left: 55%; /* Exactamente al terminar la placa */
+            width: 25%;
+            height: 15px;
+            background-color: #95a5a6;
+            border-bottom: 3px dashed var(--danger);
+            border-radius: 0 0 50% 50%;
+            transition: all 0.2s ease;
+            transform-origin: top center;
+            z-index: 15;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Fuerzas Constrictoras Externas */
+        .external-force {
+            position: absolute;
+            top: -40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .force-arrow {
+            width: 4px; height: 25px; background-color: var(--danger);
+        }
+        .force-head {
+            width: 0; height: 0;
+            border-left: 8px solid transparent; border-right: 8px solid transparent;
+            border-top: 10px solid var(--danger);
+        }
+
+        /* Sangre y Partículas */
+        .blood-stream {
+            position: absolute;
+            width: 100%; height: 100%;
+            display: flex; align-items: center;
+            z-index: 5;
+        }
+        .particle {
+            position: absolute;
+            width: 12px; height: 12px;
+            background-color: #c0392b;
+            border-radius: 50%;
+            left: -20px;
+        }
+
+        /* Conservación de Energía (Ecuación Visual) */
+        .energy-bar-container {
+            width: 100%;
+            height: 30px;
+            background: #eee;
+            border-radius: 15px;
+            overflow: hidden;
+            display: flex;
+            margin-bottom: 15px;
+            border: 2px solid #bdc3c7;
+        }
+        .e-kinetic { background: var(--kinetic); transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;}
+        .e-pressure { background: var(--pressure); transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;}
+        
+        .equation-text { text-align: center; font-weight: bold; color: var(--primary); margin-bottom: 25px; }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; }
+        .metric-val { font-size: 22px; font-weight: bold; color: var(--primary); margin: 5px 0; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; }
+        
+        .clinical-alert {
+            grid-column: span 3; padding: 12px; text-align: center; font-weight: bold; color: white;
+            border-radius: 6px; background-color: #2ecc71; transition: background 0.3s; margin-top: 10px;
+        }
+
+        /* Animación de Fatiga/Colapso */
+        @keyframes collapseWobble {
+            0% { transform: scaleY(1); }
+            50% { transform: scaleY(1.5) translateY(5px); }
+            100% { transform: scaleY(1); }
+        }
+        .collapsing { animation: collapseWobble 0.15s infinite; background-color: #e74c3c; }
+        .ruptured { transform: scaleY(2.5) translateY(10px); background-color: #8e44ad; border-bottom: 4px dashed #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Efecto Bernoulli y Colapso Arterial</h1>
+        <p class="subtitle">La pérdida de presión al salir de la estenosis causa compresión externa y fatiga dinámica.</p>
+        
+        <div class="controls-grid">
+            <div class="slider-group">
+                <label><span>Masa Ateromatosa (Reducción de Luz)</span><span id="val-stenosis">20%</span></label>
+                <input type="range" id="sl-stenosis" min="0" max="85" value="20" step="5">
+            </div>
+            <div class="slider-group">
+                <label><span>Caudal de Sangre (Demanda)</span><span id="val-flow">1.0x</span></label>
+                <input type="range" id="sl-flow" min="1" max="3" value="1" step="0.5">
+            </div>
+        </div>
+
+        <div class="equation-text">
+            Energía Total Constante = <span style="color: var(--kinetic)">Energía Cinética (Velocidad)</span> + <span style="color: var(--pressure)">Energía de Presión Estática</span>
+        </div>
+        
+        <div class="energy-bar-container">
+            <div class="e-kinetic" id="bar-kinetic" style="width: 20%;">E. Cinética</div>
+            <div class="e-pressure" id="bar-pressure" style="width: 80%;">E. Presión (Fuerza centrífuga)</div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="plaque" id="plaque"></div>
+            
+            <!-- Zona de colapso a la SALIDA de la estenosis -->
+            <div class="fragile-wall" id="fragile-wall">
+                <div class="external-force" id="ext-force">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--danger); margin-bottom: 2px;">Compresión Externa</div>
+                    <div class="force-arrow"></div>
+                    <div class="force-head"></div>
+                </div>
+            </div>
+
+            <div class="blood-stream" id="stream"></div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Velocidad de Salida</div>
+                <div class="metric-val" id="disp-vel" style="color: var(--kinetic)">Alta</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Presión Intraluminal</div>
+                <div class="metric-val" id="disp-pres" style="color: var(--pressure)">Normal</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Estado de Pared Post-Placa</div>
+                <div class="metric-val" id="disp-wall">Estable</div>
+            </div>
+            
+            <div class="clinical-alert" id="alert-box">
+                La presión intraluminal vence a las fuerzas externas. Arteria permeable.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slStenosis = document.getElementById('sl-stenosis');
+        const slFlow = document.getElementById('sl-flow');
+        const plaque = document.getElementById('plaque');
+        const fragileWall = document.getElementById('fragile-wall');
+        const extForce = document.getElementById('ext-force');
+        const stream = document.getElementById('stream');
+        
+        // Crear partículas del Jet de sangre
+        const particles = [];
+        for(let i=0; i<12; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.top = (Math.random() * 60 + 20) + '%';
+            stream.appendChild(p);
+            particles.push({ el: p, delay: Math.random() * 2 });
+        }
+
+        function updateBernoulli() {
+            const stenosis = parseInt(slStenosis.value);
+            const flow = parseFloat(slFlow.value);
+            
+            document.getElementById('val-stenosis').innerText = stenosis + '%';
+            document.getElementById('val-flow').innerText = flow.toFixed(1) + 'x';
+
+            // Ajuste visual de la placa
+            const maxLumenHeight = 180; 
+            plaque.style.height = (stenosis / 100 * maxLumenHeight) + 'px';
+
+            // FÍSICA: Efecto Bernoulli
+            // Área = 1 - estenosis. Velocidad = Flujo / Área
+            const area = (100 - stenosis) / 100;
+            const velocity = flow / area; 
+            
+            // Energía Total basal es 100.
+            // E. Cinética basal asumimos que es 20%. E. Presión es 80%.
+            // Si la velocidad aumenta, la E. Cinética chupa de la E. Presión.
+            let kineticPercentage = 20 * Math.pow(velocity, 1.5);
+            if (kineticPercentage > 95) kineticPercentage = 95; // Límite visual
+            let pressurePercentage = 100 - kineticPercentage;
+
+            // Actualizar barras de energía
+            document.getElementById('bar-kinetic').style.width = kineticPercentage + '%';
+            document.getElementById('bar-pressure').style.width = pressurePercentage + '%';
+
+            // Calcular Succión (Compresión externa vence a la interna)
+            const suctionForce = kineticPercentage - 40; // Umbral de succión simulado
+
+            // Actualizar Dashboards
+            document.getElementById('disp-vel').innerText = velocity.toFixed(1) + 'x';
+            
+            if (pressurePercentage > 60) {
+                document.getElementById('disp-pres').innerText = "Normal";
+                document.getElementById('disp-wall').innerText = "Estable";
+                document.getElementById('disp-wall').style.color = "#2c3e50";
+            } else if (pressurePercentage > 30) {
+                document.getElementById('disp-pres').innerText = "Baja ?";
+                document.getElementById('disp-wall').innerText = "Vulnerable";
+                document.getElementById('disp-wall').style.color = "#f39c12";
+            } else {
+                document.getElementById('disp-pres').innerText = "Crítica ??";
+                document.getElementById('disp-wall').innerText = "Colapso";
+                document.getElementById('disp-wall').style.color = "#c0392b";
+            }
+
+            // Animar el colapso al SALIR de la placa
+            fragileWall.classList.remove('collapsing', 'ruptured');
+            
+            if (pressurePercentage < 15) {
+                // RUPTURA / OCLUSIÓN
+                fragileWall.classList.add('ruptured');
+                extForce.style.opacity = 1;
+                document.getElementById('alert-box').style.backgroundColor = "#c0392b";
+                document.getElementById('alert-box').innerHTML = "¡OCLUSIÓN POST-ESTENÓTICA! La presión estática se desplomó. Las fuerzas compresivas externas aplastan el vaso al salir de la placa.";
+            } else if (pressurePercentage < 40) {
+                // FATIGA (Colapso dinámico)
+                fragileWall.classList.add('collapsing');
+                extForce.style.opacity = 0.8;
+                document.getElementById('alert-box').style.backgroundColor = "#e67e22";
+                document.getElementById('alert-box').innerHTML = "Compresión Externa: El jet de sangre succiona la pared al salir. Inicio de agrietamiento por fatiga cíclica.";
+            } else {
+                // NORMAL
+                extForce.style.opacity = 0;
+                fragileWall.style.transform = "scaleY(1)";
+                document.getElementById('alert-box').style.backgroundColor = "#2ecc71";
+                document.getElementById('alert-box').innerHTML = "La fuerza centrífuga intraluminal mantiene el vaso dilatado.";
+            }
+
+            // Animación de las partículas (aceleran drásticamente)
+            const animDuration = Math.max(0.3, 2.5 / velocity); 
+            particles.forEach(p => {
+                p.el.style.animation = `flowAnim ${animDuration}s linear infinite`;
+                p.el.style.animationDelay = `${p.delay}s`;
+                // Si la placa es muy grande, empujar partículas hacia el centro
+                if(stenosis > 40) {
+                    p.el.style.marginTop = (stenosis/3) + "px";
+                } else {
+                    p.el.style.marginTop = "0px";
+                }
+            });
+        }
+
+        // Keyframes
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes flowAnim {
+                0% { left: -20px; }
+                50% { width: 30px; } /* Se estiran por la velocidad */
+                100% { left: 100%; width: 12px; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        slStenosis.addEventListener('input', updateBernoulli);
+        slFlow.addEventListener('input', updateBernoulli);
+        
+        updateBernoulli();
+    </script>
+</body>
+</html>

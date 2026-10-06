@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Resolución Inflamatoria y Estabilización de Placa</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --blood: #ffcccc;
+            --plaque: #f1c40f;
+            --core: #d35400;
+            --m1-mac: #e74c3c;
+            --m2-mac: #2ecc71;
+            --hdl: #f1c40f;
+            --calcification: #bdc3c7;
+            --fibrous: #ecf0f1;
+            --damp: #c0392b;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+        .container {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px; width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        /* Controles */
+        .controls { background: #f1f2f6; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
+        label { font-weight: bold; margin-bottom: 15px; color: var(--primary); font-size: 16px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; }
+        .timeline-markers { display: flex; justify-content: space-between; font-size: 11px; color: #7f8fa6; margin-top: 10px; font-weight: bold;}
+
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative; height: 320px; background-color: var(--blood); border-radius: 8px;
+            border: 2px solid #dfe6e9; overflow: hidden; margin-bottom: 25px; display: flex; flex-direction: column; justify-content: flex-end;
+        }
+        
+        .lumen-space {
+            position: absolute; top: 0; width: 100%; height: 60px; z-index: 10;
+        }
+
+        /* Estructura de la Placa */
+        .plaque-body {
+            position: relative; width: 100%; height: 260px;
+            background: linear-gradient(180deg, #f39c12 0%, #e67e22 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            transition: all 0.5s ease;
+        }
+
+        /* Cápsula Fibrosa (Colágeno Tipo I) */
+        .fibrous-cap {
+            position: absolute; top: 0; width: 100%; height: 4px;
+            background-color: var(--fibrous); box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: height 0.5s ease; z-index: 15;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .smc-cells {
+            display: flex; gap: 15px; opacity: 0; transition: opacity 0.5s;
+        }
+        .smc { width: 25px; height: 4px; background-color: #27ae60; border-radius: 10px; }
+
+        /* Espacio Subendotelial (Células y HDL) */
+        .subendothelial-space {
+            position: absolute; top: 30px; width: 100%; height: 80px;
+            display: flex; justify-content: space-around; align-items: center; z-index: 10;
+        }
+
+        /* Macrófagos y Fenotipos */
+        .macrophage {
+            width: 45px; height: 45px; background-color: var(--m1-mac);
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.8s ease; position: relative;
+        }
+        .macrophage::after { content: "M1"; font-weight: bold; color: white; font-size: 12px; transition: all 0.5s; }
+        
+        /* Necrosis Secundaria (DAMPs) */
+        .necrosis-burst {
+            position: absolute; width: 100%; height: 100%;
+            border: 2px dashed var(--damp); border-radius: 50%;
+            animation: burstAnim 1.5s infinite;
+        }
+        .damp-particle {
+            position: absolute; color: var(--damp); font-size: 10px; font-weight: bold;
+            animation: floatUp 1.5s infinite;
+        }
+
+        /* Transporte Inverso (HDL) */
+        .hdl-flow {
+            position: absolute; top: -30px; left: 0; width: 100%; height: 100%;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 12;
+        }
+        .hdl-particle {
+            position: absolute; width: 15px; height: 15px; background-color: var(--hdl);
+            border-radius: 50%; border: 2px solid #f39c12; color: #d35400; font-size: 8px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            animation: hdlMove 3s ease-in-out infinite alternate;
+        }
+        .hdl-particle::before { content: "HDL"; }
+
+        /* Núcleo Necrótico */
+        .necrotic-core {
+            width: 80%; height: 120px; background: radial-gradient(ellipse, var(--core) 0%, #a04000 100%);
+            border-radius: 20px 20px 0 0; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            transition: all 0.8s ease;
+        }
+
+        /* Mineralización / Calcificación */
+        .calcification-layer {
+            position: absolute; bottom: 0; width: 100%; height: 0%;
+            background-color: var(--calcification); opacity: 0.8;
+            border-radius: 20px 20px 0 0; transition: all 0.8s ease;
+            display: flex; flex-wrap: wrap; justify-content: space-around; padding-top: 5px;
+        }
+        .micro-calc {
+            width: 8px; height: 8px; background-color: white; border-radius: 50%;
+            margin: 5px; opacity: 1; transition: all 0.5s;
+        }
+        
+        .core-label {
+            color: white; font-weight: bold; font-size: 12px; margin-bottom: 10px; z-index: 5;
+        }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 15px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 4; padding: 15px; background-color: #e8f4f8;
+            border-left: 5px solid #3498db; border-radius: 4px; font-size: 14px;
+            line-height: 1.5; color: #2c3e50; margin-top: 10px;
+        }
+
+        /* Animaciones */
+        @keyframes burstAnim { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-30px); opacity: 0; } }
+        @keyframes hdlMove { 0% { transform: translateY(0) scale(1); } 50% { transform: translateY(30px) scale(1.2); } 100% { transform: translateY(-20px) scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Resolución Inflamatoria y Estabilización Biomecánica</h1>
+        <p class="subtitle">Evolución desde la Necrosis Secundaria hacia el Remodelado Tisular Beneficioso</p>
+        
+        <div class="controls">
+            <label>
+                <span>Fase de Resolución de la Placa Ateroesclerótica</span>
+                <span id="stage-val">0%</span>
+            </label>
+            <input type="range" id="resolution-slider" min="0" max="100" value="0" step="5">
+            <div class="timeline-markers">
+                <span>Vulnerable (Necrosis)</span>
+                <span>Transporte Inverso (HDL)</span>
+                <span>Eferocitosis (Fenotipo M2)</span>
+                <span>Estable (Remodelado)</span>
+            </div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="lumen-space"></div>
+
+            <div class="plaque-body" id="plaque">
+                <!-- Cápsula Fibrosa -->
+                <div class="fibrous-cap" id="fib-cap">
+                    <div class="smc-cells" id="smc-cells">
+                        <div class="smc"></div><div class="smc"></div><div class="smc"></div><div class="smc"></div>
+                    </div>
+                </div>
+
+                <!-- Transporte Inverso HDL -->
+                <div class="hdl-flow" id="hdl-flow">
+                    <div class="hdl-particle" style="left: 20%; animation-delay: 0s;"></div>
+                    <div class="hdl-particle" style="left: 50%; animation-delay: 1s;"></div>
+                    <div class="hdl-particle" style="left: 80%; animation-delay: 0.5s;"></div>
+                </div>
+
+                <!-- Zona Celular -->
+                <div class="subendothelial-space">
+                    <div class="macrophage" id="mac1">
+                        <div class="necrosis-burst" id="burst1"></div>
+                        <div class="damp-particle" style="top:-10px; left:0;">DAMPs</div>
+                    </div>
+                    <div class="macrophage" id="mac2">
+                        <div class="necrosis-burst" id="burst2"></div>
+                        <div class="damp-particle" style="top:-5px; right:-10px;">DAMPs</div>
+                    </div>
+                    <div class="macrophage" id="mac3">
+                        <div class="necrosis-burst" id="burst3"></div>
+                        <div class="damp-particle" style="top:-15px; left:10px;">DAMPs</div>
+                    </div>
+                </div>
+
+                <!-- Núcleo Necrótico y Mineralización -->
+                <div class="necrotic-core" id="n-core">
+                    <div class="core-label" id="core-label">Núcleo Necrótico Expansivo</div>
+                    <div class="calcification-layer" id="calc-layer">
+                        <div class="micro-calc"></div><div class="micro-calc"></div><div class="micro-calc"></div>
+                        <div class="micro-calc"></div><div class="micro-calc"></div><div class="micro-calc"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Metabolismo Celular</div>
+                <div class="metric-state" id="st-metabolism" style="color: #c0392b;">Necrosis Secundaria</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Fenotipo Inmunológico</div>
+                <div class="metric-state" id="st-immune" style="color: #c0392b;">M1 Proinflamatorio</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Transporte de Colesterol</div>
+                <div class="metric-state" id="st-lipid">Estancado</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Remodelado Biomecánico</div>
+                <div class="metric-state" id="st-biomech" style="color: #c0392b;">Cápsula Fina / Microcalc.</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>Ambiente Adverso Hipóxico:</strong> La fagocitosis se inhibe por proteasas. Los macrófagos pierden la integridad de sus membranas (Necrosis Secundaria), liberando material tóxico (DAMPs) que recluta más leucocitos y exacerba la inflamación.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slider = document.getElementById('resolution-slider');
+        
+        // Elementos Visuales
+        const fibCap = document.getElementById('fib-cap');
+        const smcCells = document.getElementById('smc-cells');
+        const hdlFlow = document.getElementById('hdl-flow');
+        const macrophages = [document.getElementById('mac1'), document.getElementById('mac2'), document.getElementById('mac3')];
+        const bursts = [document.getElementById('burst1'), document.getElementById('burst2'), document.getElementById('burst3')];
+        const nCore = document.getElementById('n-core');
+        const calcLayer = document.getElementById('calc-layer');
+        const microCalcs = document.querySelectorAll('.micro-calc');
+        const coreLabel = document.getElementById('core-label');
+
+        // Textos
+        const stMetabolism = document.getElementById('st-metabolism');
+        const stImmune = document.getElementById('st-immune');
+        const stLipid = document.getElementById('st-lipid');
+        const stBiomech = document.getElementById('st-biomech');
+        const explanation = document.getElementById('explanation');
+
+        function updateSimulation() {
+            const val = parseInt(slider.value);
+            document.getElementById('stage-val').innerText = val + '%';
+
+            // FASE 1: Inflamación y Necrosis (0 - 30%)
+            if (val <= 30) {
+                // Cápsula
+                fibCap.style.height = '4px';
+                smcCells.style.opacity = 0;
+                
+                // Células (M1 y Necrosis)
+                macrophages.forEach(m => {
+                    m.style.backgroundColor = 'var(--m1-mac)';
+                    m.style.transform = 'scale(1)';
+                    m.style.opacity = 1;
+                });
+                bursts.forEach(b => b.style.display = 'block');
+                const styleSheet = document.styleSheets[0];
+                for(let i=0; i<macrophages.length; i++) macrophages[i].style.setProperty('--m1-mac', '#e74c3c');
+                
+                // HDL
+                hdlFlow.style.opacity = 0;
+                
+                // Núcleo y Calcio
+                nCore.style.height = '140px';
+                calcLayer.style.height = '20%';
+                calcLayer.style.background = 'transparent';
+                microCalcs.forEach(m => m.style.opacity = 1);
+                coreLabel.innerText = "Núcleo Necrótico Expansivo";
+
+                // Textos
+                stMetabolism.innerText = "Necrosis Secundaria (DAMPs)"; stMetabolism.style.color = "#c0392b";
+                stImmune.innerText = "M1 Proinflamatorio"; stImmune.style.color = "#c0392b";
+                stLipid.innerText = "Estancado"; stLipid.style.color = "#c0392b";
+                stBiomech.innerText = "Cápsula Fina / Microcalcificación"; stBiomech.style.color = "#c0392b";
+                
+                explanation.innerHTML = "<strong>Ambiente Adverso Hipóxico:</strong> La fagocitosis se inhibe por proteasas intralesionales. Las células pierden la integridad de sus membranas (<strong>Necrosis Secundaria</strong>), liberando DAMPs que perpetúan el ciclo inflamatorio.";
+                explanation.style.borderLeftColor = "#c0392b";
+            } 
+            // FASE 2: Transporte Inverso e Involución (35 - 65%)
+            else if (val <= 65) {
+                // Cápsula empieza a engrosar
+                fibCap.style.height = '8px';
+                smcCells.style.opacity = 0.5;
+                
+                // Células transicionando a M2, se detiene la necrosis
+                bursts.forEach(b => b.style.display = 'none');
+                macrophages.forEach(m => {
+                    m.style.backgroundColor = '#f1c40f'; // Transición
+                    m.style.transform = 'scale(0.9)';
+                });
+                
+                // HDL Activo
+                hdlFlow.style.opacity = 1;
+                
+                // Núcleo
+                nCore.style.height = '100px';
+                calcLayer.style.height = '40%';
+                calcLayer.style.background = 'rgba(189, 195, 199, 0.5)';
+                microCalcs.forEach(m => m.style.opacity = 0.5);
+                coreLabel.innerText = "Extracción Lipídica Activa";
+
+                // Textos
+                stMetabolism.innerText = "Aclaramiento Iniciado"; stMetabolism.style.color = "#f39c12";
+                stImmune.innerText = "Transición M1 ? M2"; stImmune.style.color = "#f39c12";
+                stLipid.innerText = "Transporte Inverso (ApoA1)"; stLipid.style.color = "#2ecc71";
+                stBiomech.innerText = "Estabilización Intermedia"; stBiomech.style.color = "#f39c12";
+                
+                explanation.innerHTML = "<strong>Transporte Inverso e Involución:</strong> Las partículas HDL penetran la pared y extraen colesterol de las células espumosas. La reducción de LDL oxidado frena el reclutamiento de monocitos y favorece la síntesis de mediadores pro-resolutivos.";
+                explanation.style.borderLeftColor = "#f1c40f";
+            }
+            // FASE 3: Remodelado Beneficioso y Mineralización Confluyente (70 - 100%)
+            else {
+                // Cápsula Gruesa (Colágeno)
+                fibCap.style.height = '18px';
+                smcCells.style.opacity = 1;
+                
+                // Eferocitosis Completa (Macrófagos M2 resolutivos limpian y desaparecen/descansan)
+                macrophages.forEach(m => {
+                    m.style.backgroundColor = 'var(--m2-mac)';
+                    m.style.transform = 'scale(0.6)';
+                    m.style.opacity = 0.6;
+                });
+                bursts.forEach(b => b.style.display = 'none');
+                
+                // HDL reduce actividad (ya limpió)
+                hdlFlow.style.opacity = 0.3;
+                
+                // Compactación y Mineralización
+                nCore.style.height = '60px'; // Compactado
+                calcLayer.style.height = '100%'; // Mineralización confluyente
+                calcLayer.style.background = 'var(--calcification)'; // Bloque sólido
+                microCalcs.forEach(m => m.style.opacity = 0);
+                coreLabel.innerText = "Núcleo Compactado";
+                coreLabel.style.color = "#2c3e50";
+
+                // Textos
+                stMetabolism.innerText = "Eferocitosis Silenciosa"; stMetabolism.style.color = "#2ecc71";
+                stImmune.innerText = "M2 Pro-resolutivo"; stImmune.style.color = "#2ecc71";
+                stLipid.innerText = "Balance Restablecido"; stLipid.style.color = "#2ecc71";
+                stBiomech.innerText = "Cápsula Gruesa / Mineralización Confluyente"; stBiomech.style.color = "#2980b9";
+                
+                explanation.innerHTML = "<strong>Remodelado Tisular Beneficioso:</strong> Se logra el <strong>Aclaramiento Silencioso (Eferocitosis)</strong> sin liberar tóxicos. El músculo liso deposita colágeno tipo I grueso. El núcleo se compacta y ocurre una <strong>Mineralización Inerte Confluyente</strong> que neutraliza la tensión biomecánica, sellando la placa.";
+                explanation.style.borderLeftColor = "#2ecc71";
+            }
+
+            // Cambiar pseudo-elemento M1 a M2
+            const style = document.createElement('style');
+            if(val > 65) {
+                style.innerHTML = `.macrophage::after { content: 'M2'; color: white; }`;
+            } else {
+                style.innerHTML = `.macrophage::after { content: 'M1'; color: white; }`;
+            }
+            document.head.appendChild(style);
+        }
+
+        slider.addEventListener('input', updateSimulation);
+        updateSimulation(); // Iniciar
+    </script>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Poiseuille (r4), Trabajo Miocárdico y Reserva Coronaria</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --heart-color: #e74c3c;
+            --vessel: #bdc3c7;
+            --plaque: #f1c40f;
+            --ischemia: #8e44ad;
+            --success: #2ecc71;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 20px; font-size: 14px; }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .slider-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 13px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        /* Simulación Visual */
+        .system-diagram {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1.5fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        
+        .heart-zone {
+            text-align: center;
+            padding: 15px;
+            background: #ffeaa7;
+            border-radius: 8px;
+            border: 2px solid #fdcb6e;
+            transition: all 0.3s;
+        }
+        .heart-icon { font-size: 40px; color: var(--heart-color); transition: transform 0.1s; }
+        .heart-work { font-weight: bold; color: var(--heart-color); font-size: 16px; margin-top: 10px; }
+
+        .vessel-zone {
+            position: relative;
+            height: 100px;
+            background-color: #ffcccc;
+            border-top: 10px solid var(--vessel);
+            border-bottom: 10px solid var(--vessel);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+        .plaque-top, .plaque-bottom {
+            position: absolute;
+            width: 40%;
+            background-color: var(--plaque);
+            border-radius: 50%;
+            left: 30%;
+            transition: height 0.3s ease;
+            opacity: 0.9;
+        }
+        .plaque-top { top: -10px; height: 10px; }
+        .plaque-bottom { bottom: -10px; height: 10px; }
+        
+        .micro-zone {
+            text-align: center;
+            padding: 15px;
+            background: #e8f8f5;
+            border-radius: 8px;
+            border: 2px solid #a3e4d7;
+            position: relative;
+        }
+        .capillary-network {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin: 10px 0;
+            align-items: center;
+        }
+        .capillary {
+            height: 8px;
+            width: 80%;
+            background-color: #ff7979;
+            border-radius: 4px;
+            transition: height 0.3s ease;
+        }
+        .metabolites {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--ischemia);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Dashboards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ced6e0;
+            text-align: center;
+            position: relative;
+        }
+        .metric-card.alert { background: #fab1a0; border-color: #e17055; }
+        .metric-val { font-size: 24px; font-weight: bold; color: var(--primary); margin: 5px 0; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; }
+        
+        /* Highlight para el r^4 */
+        .r4-highlight {
+            color: #c0392b;
+            font-weight: bold;
+            background: #ffeaa7;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .clinical-alert {
+            grid-column: span 4;
+            padding: 12px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
+            border-radius: 6px;
+            background-color: var(--success);
+            transition: background 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Integración Hemodinámica: Poiseuille (r4) y Metabolismo</h1>
+        <p class="subtitle">Estenosis, Trabajo Cardíaco, Reserva Coronaria (CFR) y Umbral de Angina</p>
+        
+        <div class="controls">
+            <div class="slider-group">
+                <label><span>Reducción de Luz (Estenosis)</span><span id="val-stenosis">0%</span></label>
+                <input type="range" id="slider-stenosis" min="0" max="85" value="0" step="5">
+                <small style="color: #7f8fa6; font-size: 11px; margin-top: 4px;">Radio del vaso epicárdico</small>
+            </div>
+            <div class="slider-group">
+                <label><span>Viscosidad Sanguínea (Hto)</span><span id="val-viscosity">40%</span></label>
+                <input type="range" id="slider-viscosity" min="35" max="65" value="40" step="1">
+                <small style="color: #7f8fa6; font-size: 11px; margin-top: 4px;">Normobárico a Policitemia</small>
+            </div>
+            <div class="slider-group">
+                <label><span>Demanda Metabólica</span><span id="val-demand">Reposo</span></label>
+                <input type="range" id="slider-demand" min="1" max="4" value="1" step="1">
+                <small style="color: #7f8fa6; font-size: 11px; margin-top: 4px;">1x (Reposo) a 4x (Esfuerzo Máx)</small>
+            </div>
+        </div>
+
+        <div class="system-diagram">
+            <div class="heart-zone" id="zone-heart">
+                <div style="font-size: 12px; font-weight: bold; color: #d35400;">BOMBA (PRESIÓN)</div>
+                <div class="heart-icon" id="icon-heart">??</div>
+                <div class="heart-work" id="display-work">Trabajo (P): 1.0x</div>
+            </div>
+            
+            <div class="vessel-zone">
+                <div class="plaque-top" id="plaque-t"></div>
+                <div class="plaque-bottom" id="plaque-b"></div>
+            </div>
+            
+            <div class="micro-zone" id="zone-micro">
+                <div style="font-size: 12px; font-weight: bold; color: #16a085;">MICROCIRCULACIÓN</div>
+                <div class="capillary-network" id="capillaries">
+                    <div class="capillary"></div>
+                    <div class="capillary"></div>
+                    <div class="capillary"></div>
+                </div>
+                <div class="metabolites" id="display-metabolites">? Láctico / Adenosina ?</div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Resistencia Placa</div>
+                <div class="metric-val" id="res-epi" style="color:#c0392b;">1.0x</div>
+                <div style="font-size: 11px; color: #7f8fa6;">Ecuación: ? / <span class="r4-highlight">r4</span></div>
+            </div>
+            <div class="metric-card" id="card-cfr">
+                <div class="metric-title">Vasodilatación Distal</div>
+                <div class="metric-val" id="res-cfr" style="font-size: 18px; margin-top: 10px;">Basal</div>
+                <div style="font-size: 10px; color: #7f8fa6; margin-top: 8px;">Reserva Coronaria</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Perfusión Real</div>
+                <div class="metric-val" id="res-flow">100%</div>
+                <div style="font-size: 10px; color: #7f8fa6;">Flujo aportado al tejido</div>
+            </div>
+            <div class="metric-card" id="card-ischemia">
+                <div class="metric-title">Estado Celular</div>
+                <div class="metric-val" id="res-cell" style="font-size: 16px; margin-top: 12px;">Aeróbico</div>
+                <div style="font-size: 10px; color: #7f8fa6; margin-top: 5px;">Producción de ATP</div>
+            </div>
+            
+            <div class="clinical-alert" id="alert-box">
+                Equilibrio Homeostático: El flujo coronario suple la demanda miocárdica sin esfuerzo.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slStenosis = document.getElementById('slider-stenosis');
+        const slViscosity = document.getElementById('slider-viscosity');
+        const slDemand = document.getElementById('slider-demand');
+        
+        const plaqueT = document.getElementById('plaque-t');
+        const plaqueB = document.getElementById('plaque-b');
+        const capillaries = document.querySelectorAll('.capillary');
+        const iconHeart = document.getElementById('icon-heart');
+        const displayWork = document.getElementById('display-work');
+        const displayMetabolites = document.getElementById('display-metabolites');
+        const alertBox = document.getElementById('alert-box');
+        const zoneHeart = document.getElementById('zone-heart');
+        const cardCfr = document.getElementById('card-cfr');
+        const cardIschemia = document.getElementById('card-ischemia');
+        
+        let beatInterval;
+
+        function updateSystem() {
+            const stenosis = parseInt(slStenosis.value);
+            const viscosity = parseInt(slViscosity.value);
+            const demand = parseInt(slDemand.value);
+
+            // Etiquetas UI
+            document.getElementById('val-stenosis').innerText = stenosis + '%';
+            document.getElementById('val-viscosity').innerText = viscosity + '%';
+            const demandLabels = ["Reposo", "Esfuerzo Leve", "Esfuerzo Mod.", "Esfuerzo Máx"];
+            document.getElementById('val-demand').innerText = demandLabels[demand - 1];
+
+            // Visual Placa Epicárdica
+            plaqueT.style.height = (stenosis / 100 * 50) + 'px';
+            plaqueB.style.height = (stenosis / 100 * 50) + 'px';
+
+            // 1. Resistencia Epicárdica Pura (El radio a la 4ta potencia expuesto)
+            // Calculamos el radio relativo (de 1.0 a 0.15)
+            const rRelative = Math.max((100 - stenosis) / 100, 0.15); 
+            const htcRelative = viscosity / 40; 
+            
+            // LEY DE POISEUILLE: R = Viscosidad / r^4
+            const rawResistance = htcRelative / Math.pow(rRelative, 4);
+            document.getElementById('res-epi').innerText = rawResistance.toFixed(1) + 'x';
+
+            // 2. Impacto Sistémico Clínico (La microcirculación amortigua)
+            // Aunque la placa aumente a 16x (50%), la microcirculación representa el gran volumen
+            // Factor de amortiguación clínica: convierte el rawResistance en una carga real para el corazón
+            const clinicalLoad = 1 + (rawResistance - 1) / 40; 
+            
+            // 3. Reserva de Flujo Coronario (CFR)
+            const maxVasodilation = 4.0; // Máxima dilatación es 4x
+            const requiredVasodilation = demand * clinicalLoad; 
+            
+            let cfrStatus = "";
+            let capThickness = 8; 
+
+            if (requiredVasodilation <= 1.2) {
+                cfrStatus = "Basal";
+                capThickness = 8;
+                cardCfr.style.borderColor = "#ced6e0";
+            } else if (requiredVasodilation > 1.2 && requiredVasodilation <= maxVasodilation) {
+                cfrStatus = "Activa";
+                capThickness = 8 + ((requiredVasodilation / maxVasodilation) * 8);
+                cardCfr.style.borderColor = "#f1c40f";
+            } else {
+                cfrStatus = "Agotada";
+                capThickness = 16; 
+                cardCfr.style.borderColor = "#e74c3c";
+            }
+
+            document.getElementById('res-cfr').innerText = cfrStatus;
+            capillaries.forEach(cap => cap.style.height = capThickness + 'px');
+
+            // 4. Trabajo Cardíaco (Aumento de presión de la bomba)
+            let heartWork = Math.min(demand * clinicalLoad, 6); 
+            displayWork.innerText = "Trabajo: " + heartWork.toFixed(1) + "x";
+            
+            clearInterval(beatInterval);
+            let beatSpeed = 1000 / (demand * (heartWork > 3 ? 1.5 : 1));
+            beatInterval = setInterval(() => {
+                iconHeart.style.transform = "scale(1.2)";
+                setTimeout(() => iconHeart.style.transform = "scale(1)", beatSpeed / 2);
+            }, beatSpeed);
+
+            zoneHeart.style.backgroundColor = (heartWork > 3) ? "#ffcccc" : "#ffeaa7";
+
+            // 5. Isquemia Celular y Angina
+            let actualFlow = 100;
+            let isIschemic = false;
+
+            if (requiredVasodilation > maxVasodilation) {
+                actualFlow = (maxVasodilation / requiredVasodilation) * 100;
+                isIschemic = true;
+            }
+
+            document.getElementById('res-flow').innerText = actualFlow.toFixed(0) + '%';
+
+            if (isIschemic) {
+                document.getElementById('res-cell').innerText = "Anaeróbico";
+                document.getElementById('res-cell').style.color = "var(--ischemia)";
+                cardIschemia.classList.add('alert');
+                displayMetabolites.style.opacity = 1;
+                
+                alertBox.style.backgroundColor = "var(--heart-color)";
+                if (demand === 1) {
+                    alertBox.innerHTML = "¡ANGINA DE REPOSO! Resistencia exponencial (r4) > 120x supera el límite microvascular.";
+                } else {
+                    alertBox.innerHTML = "ANGINA DE ESFUERZO: Flujo demandado excede la máxima vasodilatación compensatoria.";
+                }
+            } else {
+                document.getElementById('res-cell').innerText = "Aeróbico";
+                document.getElementById('res-cell').style.color = "var(--success)";
+                cardIschemia.classList.remove('alert');
+                displayMetabolites.style.opacity = 0;
+                
+                if (heartWork > 2.0 && rawResistance > 5) {
+                    alertBox.style.backgroundColor = "#f39c12";
+                    alertBox.innerHTML = "COMPENSACIÓN: Alto trabajo cardíaco (Presión) y dilatación distal superan la resistencia de la placa.";
+                } else {
+                    alertBox.style.backgroundColor = "var(--success)";
+                    alertBox.innerHTML = "Equilibrio Homeostático: El flujo coronario suple la demanda metabólica.";
+                }
+            }
+        }
+
+        // Listeners
+        slStenosis.addEventListener('input', updateSystem);
+        slViscosity.addEventListener('input', updateSystem);
+        slDemand.addEventListener('input', updateSystem);
+
+        updateSystem();
+    </script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Exposoma y Factores de Riesgo Ateroesclerótico</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --success: #2ecc71;
+            --traditional: #2980b9;
+            --environmental: #27ae60;
+            --residual: #8e44ad;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+        .container {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 1100px; width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 26px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        .layout-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 25px;
+        }
+
+        /* Panel de Controles (Factores de Riesgo) */
+        .risk-panel {
+            background: #f1f2f6; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 20px;
+        }
+        .category-title {
+            font-size: 13px; font-weight: bold; color: var(--secondary); text-transform: uppercase; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px; margin-bottom: 10px;
+        }
+        .btn-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .btn-risk {
+            padding: 10px; font-size: 13px; font-weight: bold; border: 2px solid transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; text-align: center; color: white;
+        }
+        
+        .btn-trad { background-color: #a9cce3; color: var(--secondary); border-color: #5499c7; }
+        .btn-trad:hover, .btn-trad.active { background-color: var(--traditional); color: white; }
+        
+        .btn-env { background-color: #a9dfbf; color: var(--secondary); border-color: #52be80; }
+        .btn-env:hover, .btn-env.active { background-color: var(--environmental); color: white; }
+        
+        .btn-res { background-color: #d7bde2; color: var(--secondary); border-color: #af7ac5; }
+        .btn-res:hover, .btn-res.active { background-color: var(--residual); color: white; }
+
+        /* Panel de Fisiopatología */
+        .patho-panel {
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .visual-display {
+            height: 250px; background-color: var(--secondary); border-radius: 8px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
+        .organ-icon {
+            font-size: 60px; position: absolute; opacity: 0; transform: scale(0.5); transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .organ-icon.active { opacity: 1; transform: scale(1); }
+        
+        .patho-box {
+            background: white; border: 2px solid #dfe6e9; border-radius: 8px; padding: 20px; min-height: 200px;
+        }
+        .patho-title {
+            font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 10px; border-bottom: 2px solid var(--accent); padding-bottom: 5px; display: inline-block;
+        }
+        .patho-text {
+            font-size: 14.5px; line-height: 1.6; color: #34495e;
+        }
+        .patho-keyword { font-weight: bold; color: var(--danger); }
+        
+        .systemic-link {
+            position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, rgba(231,76,60,0.2) 0%, transparent 70%); opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Exposoma y Ejes Sistémicos de Riesgo</h1>
+        <p class="subtitle">Análisis fisiopatológico desde el Estudio Framingham hasta el Riesgo Residual Contemporáneo</p>
+        
+        <div class="layout-grid">
+            <!-- Panel de Selección -->
+            <div class="risk-panel">
+                <div>
+                    <div class="category-title" style="border-color: var(--traditional);">Factores Tradicionales (Modificables)</div>
+                    <div class="btn-grid">
+                        <button class="btn-risk btn-trad" onclick="showPatho('ldl', this)">Dislipidemia (LDL)</button>
+                        <button class="btn-risk btn-trad" onclick="showPatho('hta', this)">Hipertensión Arterial</button>
+                        <button class="btn-risk btn-trad" onclick="showPatho('tabaco', this)">Tabaquismo</button>
+                        <button class="btn-risk btn-trad" onclick="showPatho('dm', this)">Diabetes y Sd. Metabólico</button>
+                        <button class="btn-risk btn-trad" onclick="showPatho('sedentarismo', this)">Sedentarismo</button>
+                        <button class="btn-risk btn-trad" onclick="showPatho('estrogenos', this)">Condición Estrogénica</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="category-title" style="border-color: var(--environmental);">Ambientales y Toxicológicos</div>
+                    <div class="btn-grid">
+                        <button class="btn-risk btn-env" onclick="showPatho('polucion', this)">Contaminación y Partículas</button>
+                        <button class="btn-risk btn-env" onclick="showPatho('plasticos', this)">Micro y Nanoplásticos</button>
+                        <button class="btn-risk btn-env" onclick="showPatho('metales', this)">Metales Pesados (Cd/Pb)</button>
+                        <button class="btn-risk btn-env" onclick="showPatho('microbioma', this)">Disbiosis (Eje Intestino-Corazón)</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="category-title" style="border-color: var(--residual);">Biomarcadores y Riesgo Psicosocial</div>
+                    <div class="btn-grid">
+                        <button class="btn-risk btn-res" onclick="showPatho('lpa', this)">Lipoproteína (a)</button>
+                        <button class="btn-risk btn-res" onclick="showPatho('nlrp3', this)">Riesgo Inflamatorio (NLRP3)</button>
+                        <button class="btn-risk btn-res" onclick="showPatho('remanentes', this)">Remanentes Ricos en TG</button>
+                        <button class="btn-risk btn-res" onclick="showPatho('estres', this)">Eje Amígdala-Médula-Arteria</button>
+                        <button class="btn-risk btn-res" onclick="showPatho('saos', this)">Apnea del Sueño (SAOS)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Fisiopatológico -->
+            <div class="patho-panel">
+                <div class="visual-display">
+                    <div class="systemic-link" id="sys-link"></div>
+                    <div class="organ-icon" id="icon-artery">??</div>
+                    <div class="organ-icon" id="icon-lungs">??</div>
+                    <div class="organ-icon" id="icon-gut">??</div>
+                    <div class="organ-icon" id="icon-brain">??</div>
+                    <div class="organ-icon" id="icon-liver">??</div>
+                </div>
+
+                <div class="patho-box">
+                    <div class="patho-title" id="p-title">Seleccione un Factor de Riesgo</div>
+                    <div class="patho-text" id="p-text">
+                        Explore los mecanismos moleculares y hemodinámicos que perpetúan el desarrollo de la ateroesclerosis.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const data = {
+            'ldl': {
+                title: 'Dislipidemia (LDL)',
+                icon: 'icon-artery',
+                text: 'Las concentraciones altas de LDL circulante se acumulan en el espacio subendotelial. Allí sufren modificaciones químicas (<span class="patho-keyword">oxidación</span>) que dañan profundamente la íntima, dando inicio y perpetuando el desarrollo de las lesiones ateroescleróticas mediante la captura descontrolada por macrófagos.'
+            },
+            'hta': {
+                title: 'Hipertensión Arterial',
+                icon: 'icon-artery',
+                text: 'La presión elevada causa lesión vascular e incrementa la permeabilidad a las lipoproteínas. El <span class="patho-keyword">esfuerzo circunferencial cíclico</span> favorece que las CML sinteticen proteoglucanos que atrapan el LDL. Además, la <span class="patho-keyword">Angiotensina</span> actúa como potente citocina proinflamatoria y estimulante del estrés oxidativo.'
+            },
+            'tabaco': {
+                title: 'Tabaquismo',
+                icon: 'icon-lungs',
+                text: 'Predispone a la isquemia por múltiples vías: mayor modificación oxidativa del LDL, reducción de HDL, <span class="patho-keyword">disfunción endotelial por hipoxia</span>, aumento de adhesión plaquetaria, y el desplazamiento del oxígeno de la hemoglobina por efecto del <span class="patho-keyword">monóxido de carbono</span>.'
+            },
+            'dm': {
+                title: 'Diabetes y Sd. Metabólico',
+                icon: 'icon-liver',
+                text: 'El estado hiperglucémico provoca la <span class="patho-keyword">glucosilación no enzimática</span> de las lipoproteínas, fomentando su retención en macrófagos. Genera un estado protrombótico, antifibrinolítico y disfunción endotelial con severa disminución en la secreción protectora de Óxido Nítrico (NO).'
+            },
+            'sedentarismo': {
+                title: 'Sedentarismo vs. Ejercicio',
+                icon: 'icon-artery',
+                text: 'El ejercicio mitiga la aterogénesis mejorando la sensibilidad a la insulina y fomentando la <span class="patho-keyword">producción endotelial de NO</span>, confiriendo una protección directa y demostrable contra la mortalidad cardiovascular.'
+            },
+            'estrogenos': {
+                title: 'Condición Estrogénica',
+                icon: 'icon-artery',
+                text: 'Los <span class="patho-keyword">estrógenos</span> poseen propiedades ateroprotectoras vitales antes de la menopausia: incrementan el HDL, reducen el LDL, y ejercen acciones antioxidantes, antiagregantes y vasodilatadoras dependientes del endotelio. Tras la menopausia, el riesgo se iguala al de los hombres.'
+            },
+            'polucion': {
+                title: 'Contaminación Atmosférica',
+                icon: 'icon-lungs',
+                text: 'Las partículas finas y óxidos de nitrógeno ingresan a los alvéolos y <span class="patho-keyword">traslocan la barrera alvéolo-capilar</span>. Ingresan directamente a la circulación sistémica, contactando y agrediendo crónicamente a las células endoteliales de los lechos vasculares distales.'
+            },
+            'plasticos': {
+                title: 'Micro y Nanoplásticos',
+                icon: 'icon-gut',
+                text: 'Tras cruzar las barreras epiteliales (intestino/pulmón), ingresan al torrente sanguíneo y son fagocitados por macrófagos. Esto desencadena <span class="patho-keyword">inflamación crónica estéril</span>, estrés oxidativo y apoptosis eventual de las propias células fagocíticas.'
+            },
+            'metales': {
+                title: 'Metales Pesados (Cadmio y Plomo)',
+                icon: 'icon-artery',
+                text: 'Compiten por sitios de unión celular alterando la homeostasis. El <span class="patho-keyword">Cadmio</span> activa el sistema renina-angiotensina local, promoviendo vasoconstricción y remodelado adverso. El <span class="patho-keyword">Plomo</span> induce disfunción del músculo liso e hipertensión.'
+            },
+            'microbioma': {
+                title: 'Disbiosis (Eje Intestino-Corazón)',
+                icon: 'icon-gut',
+                text: 'Dietas occidentales alteran las uniones estrechas del enterocito (Disbiosis). Esto permite la <span class="patho-keyword">traslocación de lipopolisacáridos (LPS)</span> a la circulación sistémica, los cuales se unen a receptores <span class="patho-keyword">Toll-Like 4</span> en macrófagos y endotelio, disparando una inflamación sistémica.'
+            },
+            'lpa': {
+                title: 'Lipoproteína (a)',
+                icon: 'icon-liver',
+                text: 'Partícula similar al LDL unida a la <span class="patho-keyword">Apolipoproteína(a)</span>, determinada en un 90% genéticamente (intratable con estilo de vida). Es proaterogénica, protrombótica, antifibrinolítica, y transporta fosfolípidos oxidados altamente proinflamatorios al subendotelio.'
+            },
+            'nlrp3': {
+                title: 'Riesgo Inflamatorio (Inflamasoma NLRP3)',
+                icon: 'icon-artery',
+                text: 'Responsable del riesgo residual (PCR > 2 mg/L) en pacientes con LDL controlado. El complejo <span class="patho-keyword">NLRP3</span> en macrófagos se activa por DAMPs (cristales de colesterol, flujo turbulento), desatando una tormenta de interleucinas proinflamatorias en la placa.'
+            },
+            'remanentes': {
+                title: 'Remanentes Ricos en Triglicéridos',
+                icon: 'icon-liver',
+                text: 'Lipoproteínas IDL y quilomicrones remanentes (pequeños y densos en colesterol). A diferencia del LDL, <span class="patho-keyword">no requieren oxidación previa</span> para ser fagocitados. Infiltran la íntima y son devorados masivamente, expandiendo rápidamente el núcleo lipídico.'
+            },
+            'estres': {
+                title: 'Eje Amígdala-Médula Ósea-Arteria',
+                icon: 'icon-brain',
+                text: 'El estrés psicosocial activa la amígdala, enviando impulsos simpáticos a la <span class="patho-keyword">médula ósea</span>. La noradrenalina induce hiperplasia linfohematopoyética, liberando torrentes de <span class="patho-keyword">monocitos inmaduros</span> que migran a las arterias, exacerbando la inflamación vascular intrínseca.'
+            },
+            'saos': {
+                title: 'Apnea del Sueño (SAOS)',
+                icon: 'icon-brain',
+                text: 'La obstrucción respiratoria causa ciclos de <span class="patho-keyword">hipoxia intermitente y reoxigenación rápida</span>. Este proceso destructivo induce una sobreproducción masiva de radicales libres de oxígeno (ROS) y desploma la disponibilidad de óxido nítrico endotelial.'
+            }
+        };
+
+        function showPatho(key, btnElement) {
+            // Limpiar botones activos
+            document.querySelectorAll('.btn-risk').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // Actualizar Texto
+            document.getElementById('p-title').innerText = data[key].title;
+            document.getElementById('p-text').innerHTML = data[key].text;
+
+            // Actualizar Iconos
+            document.querySelectorAll('.organ-icon').forEach(icon => icon.classList.remove('active'));
+            document.getElementById(data[key].icon).classList.add('active');
+            
+            // Efecto visual de enlace sistémico
+            const link = document.getElementById('sys-link');
+            link.style.opacity = 1;
+            setTimeout(() => link.style.opacity = 0, 500);
+        }
+    </script>
+</body>
+</html>

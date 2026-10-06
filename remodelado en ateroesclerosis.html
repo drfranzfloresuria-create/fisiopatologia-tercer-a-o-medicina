@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Remodelado Arterial, CFR y Estabilidad de Placa</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --lumen: #e74c3c;
+            --wall: #bdc3c7;
+            --plaque: #f1c40f;
+            --fibrous-cap: #ecf0f1;
+            --capillary: #ff7979;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        .controls {
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        label { font-weight: bold; margin-bottom: 15px; color: var(--primary); font-size: 16px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; }
+        
+        .simulation-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        /* 1. SECCIÓN EPICÁRDICA */
+        .glagov-view {
+            background-color: white;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            height: 280px;
+        }
+        .view-title {
+            position: absolute; top: 10px; left: 15px;
+            font-size: 12px; font-weight: bold; color: #7f8fa6; text-transform: uppercase;
+        }
+        
+        /* Contenedor del Vaso */
+        .vessel-outer {
+            width: 120px;
+            height: 120px;
+            background-color: var(--plaque);
+            border: 8px solid var(--wall);
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: inset -10px -10px 20px rgba(211, 84, 0, 0.6);
+        }
+        
+        /* Luz (Lumen) y Cubierta Fibrosa (Borde) */
+        .lumen-inner {
+            width: 120px;
+            height: 120px;
+            background-color: var(--lumen);
+            border-radius: 50%;
+            border-style: solid;
+            border-color: #c0392b; /* Inicia roja/delgada */
+            border-width: 2px;
+            position: absolute;
+            /* Centrado perfecto para evitar desalineación */
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            box-sizing: border-box; /* Mantiene el borde dentro del cálculo del width */
+        }
+
+        /* Marcas de Límite Anatómico Original */
+        .original-boundary {
+            position: absolute;
+            width: 136px; height: 136px;
+            border: 1px dashed #7f8fa6;
+            border-radius: 50%;
+            pointer-events: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* 2. SECCIÓN MICROVASCULAR (Reserva Coronaria) */
+        .micro-view {
+            background-color: #e8f8f5;
+            border: 2px solid #a3e4d7;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .capillary-network {
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: space-evenly; align-items: center;
+        }
+        .capillary {
+            width: 80%; height: 6px;
+            background-color: var(--capillary);
+            border-radius: 10px;
+            transition: height 0.3s ease, background-color 0.3s ease;
+            position: relative; overflow: hidden;
+        }
+        .flow-anim {
+            position: absolute; top: 0; left: 0; height: 100%; width: 20px;
+            background: rgba(255,255,255,0.4); animation: flow 1s linear infinite;
+        }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; transition: all 0.3s; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 15px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 4; padding: 15px; background-color: #e8f4f8;
+            border-left: 5px solid #3498db; border-radius: 4px; font-size: 14px;
+            line-height: 1.5; color: #2c3e50; margin-top: 10px;
+        }
+
+        @keyframes flow { 0% { left: -20px; } 100% { left: 100%; } }
+        @keyframes pulseAlert { 0% { transform: scale(1); box-shadow: 0 0 0 rgba(231,76,60,0.7); } 50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(231,76,60,0.7); } 100% { transform: scale(1); box-shadow: 0 0 0 rgba(231,76,60,0); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Efecto Glagov, Estabilidad de Placa y CFR</h1>
+        <p class="subtitle">Paradigma clínico: Las placas que causan angina no son las que causan infartos súbitos.</p>
+        
+        <div class="controls">
+            <label>
+                <span>Carga de Placa Ateromatosa</span>
+                <span id="plaque-val">0%</span>
+            </label>
+            <input type="range" id="plaque-slider" min="0" max="95" value="0" step="1">
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:#7f8fa6; margin-top:5px; font-weight:bold;">
+                <span>0%</span>
+                <span>Límite Expansión (40%)</span>
+                <span>Placa Fibrosa y Agotamiento CFR (>70%)</span>
+                <span>95%</span>
+            </div>
+        </div>
+
+        <div class="simulation-grid">
+            <div class="glagov-view">
+                <div class="view-title">Arteria Epicárdica (Corte Transversal)</div>
+                <div class="original-boundary"></div>
+                
+                <div class="vessel-outer" id="vessel">
+                    <div class="lumen-inner" id="lumen">Luz</div>
+                </div>
+                
+                <div style="font-size: 11px; color: #7f8fa6; margin-top: 20px; position:absolute; bottom:15px;">Línea punteada: Anatomía original</div>
+            </div>
+
+            <div class="micro-view">
+                <div class="view-title">Microcirculación Distal</div>
+                <div class="capillary-network">
+                    <div class="capillary" id="cap1"><div class="flow-anim"></div></div>
+                    <div class="capillary" id="cap2"><div class="flow-anim"></div></div>
+                    <div class="capillary" id="cap3"><div class="flow-anim"></div></div>
+                    <div class="capillary" id="cap4"><div class="flow-anim"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card" id="card-remodel">
+                <div class="metric-title">Fase de Remodelado</div>
+                <div class="metric-state" id="st-remodel">Ausente</div>
+            </div>
+            <div class="metric-card" id="card-lumen">
+                <div class="metric-title">Luz y Cápsula Fibrosa</div>
+                <div class="metric-state" id="st-lumen" style="color: #2ecc71;">100% (Fina)</div>
+            </div>
+            <div class="metric-card" id="card-vuln">
+                <div class="metric-title">Riesgo de Ruptura</div>
+                <div class="metric-state" id="st-vuln" style="color: #2ecc71;">Bajo</div>
+            </div>
+            <div class="metric-card" id="card-cfr">
+                <div class="metric-title">Reserva Coronaria</div>
+                <div class="metric-state" id="st-cfr">Tono Basal</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>Vaso Sano:</strong> Sin presencia de placa.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slider = document.getElementById('plaque-slider');
+        const vessel = document.getElementById('vessel');
+        const lumen = document.getElementById('lumen');
+        const capillaries = document.querySelectorAll('.capillary');
+        
+        const stRemodel = document.getElementById('st-remodel');
+        const stLumen = document.getElementById('st-lumen');
+        const stVuln = document.getElementById('st-vuln');
+        const stCfr = document.getElementById('st-cfr');
+        const explanation = document.getElementById('explanation');
+        const cardCfr = document.getElementById('card-cfr');
+
+        function updateSimulation() {
+            const val = parseInt(slider.value);
+            document.getElementById('plaque-val').innerText = val + '%';
+
+            let vesselSize = 120; 
+            let lumenSize = 120;  
+            let capHeight = 6;    
+            let lumenPercent = 100;
+            let fibrousThickness = 2;
+
+            if (val <= 40) {
+                // 1. Remodelado Positivo (Glagov) - Placa blanda y vulnerable
+                vesselSize = 120 + (val * 1.5); 
+                lumenSize = 120; 
+                lumenPercent = 100;
+                fibrousThickness = 2; // Cápsula fina y frágil
+                
+                // Visual Lumen
+                lumen.style.borderWidth = fibrousThickness + 'px';
+                lumen.style.borderColor = "rgba(231, 76, 60, 0.5)"; // Borde rojizo (inestable/inflamado)
+                
+                // Microcirculación
+                capHeight = 6;
+                
+                // Textos
+                stRemodel.innerText = val === 0 ? "Ausente" : "Positivo Expansivo";
+                stRemodel.style.color = val === 0 ? "#2c3e50" : "#f39c12";
+                
+                stLumen.innerText = "100% (Cápsula Fina)";
+                stLumen.style.color = "#2ecc71";
+                
+                stVuln.innerText = val > 20 ? "Alto (Vulnerable)" : "Bajo";
+                stVuln.style.color = val > 20 ? "#e74c3c" : "#2ecc71";
+                
+                stCfr.innerText = "Tono Basal";
+                cardCfr.style.borderColor = "#ced6e0";
+                
+                explanation.innerHTML = val === 0 ? 
+                    "<strong>Vaso Sano:</strong> Sin placa." : 
+                    "<strong>Remodelado Positivo (Efecto Glagov):</strong> La arteria se expande preservando el 100% de la luz (evita la isquemia). Sin embargo, la placa está cubierta por una <strong>cápsula fibrosa delgada</strong>. Clínicamente asintomática, pero altamente letal y vulnerable a fisurarse.";
+                explanation.style.borderLeftColor = val === 0 ? "#3498db" : "#e74c3c";
+                
+                vessel.style.animation = "none";
+                cardCfr.style.animation = "none";
+                capillaries.forEach(c => c.style.backgroundColor = "var(--capillary)");
+
+            } else {
+                // 2. Remodelado Negativo (Estabilización Fibrosa e Isquemia)
+                vesselSize = 120 + (40 * 1.5); // Tope externo
+                
+                const excessPlaque = val - 40; 
+                lumenPercent = 100 - (excessPlaque * 1.8); 
+                if (lumenPercent < 5) lumenPercent = 5;
+                lumenSize = 120 * (lumenPercent / 100);
+
+                // Engrosamiento de Cápsula Fibrosa (Depósito de matriz extracelular)
+                fibrousThickness = 2 + (excessPlaque * 0.3); // Crece la matriz colágena
+                if(fibrousThickness > 12) fibrousThickness = 12; // Límite visual
+                
+                lumen.style.borderWidth = fibrousThickness + 'px';
+                lumen.style.borderColor = "var(--fibrous-cap)"; // Borde blanquecino/grisáceo (cicatrizal)
+
+                // Compensación Microvascular
+                if (val <= 75) {
+                    capHeight = 6 + (excessPlaque * 0.4); 
+                    stCfr.innerText = "Dilatación Activa";
+                    stCfr.style.color = "#16a085";
+                    cardCfr.style.borderColor = "#1abc9c";
+                    cardCfr.style.animation = "none";
+                    capillaries.forEach(c => c.style.backgroundColor = "#1abc9c");
+                    
+                    explanation.innerHTML = "<strong>Remodelado Negativo Constructivo:</strong> La placa invade la luz. Las Células de Músculo Liso han sintetizado matriz extracelular, <strong>engrosando la cubierta fibrosa</strong> y volviéndola estable. La microcirculación dilata sus capilares para evitar la isquemia basal[cite: 2].";
+                    explanation.style.borderLeftColor = "#16a085";
+                } else {
+                    capHeight = 22; 
+                    stCfr.innerText = "Agotada (Isquemia)";
+                    stCfr.style.color = "#c0392b";
+                    cardCfr.style.borderColor = "#c0392b";
+                    cardCfr.style.animation = "pulseAlert 1s infinite";
+                    capillaries.forEach(c => c.style.backgroundColor = "#8e44ad");
+                    
+                    explanation.innerHTML = "<strong>Placa Estable con Isquemia Clínica:</strong> Una cubierta fibrosa gruesa protege contra la ruptura (bajo riesgo de infarto súbito trombótico), pero la <strong>reserva de flujo coronario se agota</strong> por la estenosis crítica, produciendo angina crónica estable ante esfuerzos mínimos o reposo[cite: 2].";
+                    explanation.style.borderLeftColor = "#8e44ad";
+                }
+
+                stRemodel.innerText = "Negativo Constructivo";
+                stRemodel.style.color = "#c0392b";
+                
+                stLumen.innerText = `${lumenPercent.toFixed(0)}% (Cápsula Gruesa)`;
+                stLumen.style.color = lumenPercent > 50 ? "#f39c12" : "#c0392b";
+                
+                stVuln.innerText = "Baja (Placa Estable)";
+                stVuln.style.color = "#2ecc71"; // Riesgo de ruptura cae por la matriz fibrilar
+            }
+
+            vessel.style.width = vesselSize + 'px';
+            vessel.style.height = vesselSize + 'px';
+            lumen.style.width = lumenSize + 'px';
+            lumen.style.height = lumenSize + 'px';
+
+            capillaries.forEach(cap => cap.style.height = capHeight + 'px');
+        }
+
+        slider.addEventListener('input', updateSimulation);
+        updateSimulation();
+    </script>
+</body>
+</html>

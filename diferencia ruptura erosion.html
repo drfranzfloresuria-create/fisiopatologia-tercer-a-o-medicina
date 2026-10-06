@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Diferencial: Ruptura vs. Erosión</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --blood: #ffcccc;
+            --plaque: #f1c40f;
+            --fibrous-thick: #ecf0f1;
+            --fibrous-thin: #bdc3c7;
+            --red-thrombus: #c0392b;
+            --white-thrombus: #dfe6e9;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+        .container {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 1000px; width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        .scenario-selector {
+            display: flex; justify-content: center; gap: 20px; margin-bottom: 25px;
+        }
+        .btn-scenario {
+            padding: 15px 30px; font-size: 16px; font-weight: bold; border: 2px solid #ced6e0;
+            background-color: white; color: #7f8fa6; border-radius: 8px; cursor: pointer; transition: all 0.3s;
+            display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px;
+        }
+        .btn-scenario small { font-size: 11px; font-weight: normal; }
+        .btn-scenario.active-rupture { background-color: var(--danger); color: white; border-color: #922b21; box-shadow: 0 5px 15px rgba(231,76,60,0.4);}
+        .btn-scenario.active-erosion { background-color: #8e44ad; color: white; border-color: #732d91; box-shadow: 0 5px 15px rgba(142,68,173,0.4);}
+
+        .layout-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;
+        }
+
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative; height: 350px; background-color: var(--blood); border-radius: 8px;
+            border: 2px solid #dfe6e9; overflow: hidden;
+        }
+        
+        .vessel-wall-top, .vessel-wall-bottom {
+            position: absolute; width: 100%; height: 25px; background-color: #e67e22; z-index: 20;
+        }
+        .vessel-wall-top { top: 0; border-bottom: 3px solid #d35400; }
+        .vessel-wall-bottom { bottom: 0; border-top: 3px solid #d35400; }
+
+        .plaque-mound {
+            position: absolute; bottom: 25px; left: 15%; width: 70%; height: 140px;
+            background: radial-gradient(ellipse at bottom, #d35400 0%, var(--plaque) 100%);
+            border-radius: 50% 50% 0 0; z-index: 3; transition: all 0.4s;
+        }
+        .fibrous-cap {
+            position: absolute; top: -4px; left: 0; width: 100%; height: 100%;
+            border-top: 4px solid; border-radius: 50% 50% 0 0; z-index: 4; transition: all 0.4s;
+        }
+
+        /* TROMBO ROJO (Oclusivo Total) */
+        .rupture-fissure {
+            position: absolute; top: 30px; left: 30%; width: 40px; height: 8px;
+            background-color: #7a1510; transform: rotate(35deg); opacity: 0; z-index: 5;
+        }
+        .red-thrombus {
+            position: absolute; 
+            /* Se ancla desde la placa hasta tocar la pared superior */
+            top: -160px; left: 25%; width: 140px; height: 190px;
+            background: linear-gradient(135deg, var(--red-thrombus) 0%, #7a1510 100%); 
+            border-radius: 20px 40px 10px 10px;
+            box-shadow: -10px 0 20px rgba(192, 57, 43, 0.9); opacity: 0; z-index: 15;
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box;
+            border-left: 3px solid #e74c3c; /* Borde de choque */
+        }
+        .rbc { width: 12px; height: 12px; background: #e74c3c; border-radius: 50%; margin: 2px; border: 1px solid #922b21;}
+        .fibrin-mesh { position: absolute; width: 100%; height: 100%; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 12px); z-index: 16; pointer-events: none;}
+
+        /* TROMBO BLANCO (Suboclusivo/Mural) */
+        .white-thrombus {
+            position: absolute; top: -50px; left: 35%; width: 130px; height: 60px;
+            background-color: var(--white-thrombus); border-radius: 30px 30px 10px 10px;
+            border: 2px solid #b2bec3; box-shadow: 0 -5px 15px rgba(236, 240, 241, 0.9); opacity: 0; z-index: 15;
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: center; padding: 5px; box-sizing: border-box;
+        }
+        .platelet { width: 6px; height: 6px; background: #7f8fa6; border-radius: 50%; margin: 1px; }
+        .net-web {
+            position: absolute; width: 100%; height: 100%;
+            background-image: repeating-linear-gradient(30deg, transparent, transparent 8px, rgba(52, 152, 219, 0.5) 8px, rgba(52, 152, 219, 0.5) 10px),
+                              repeating-linear-gradient(-30deg, transparent, transparent 8px, rgba(52, 152, 219, 0.5) 8px, rgba(52, 152, 219, 0.5) 10px);
+            z-index: 16; opacity: 0; border-radius: 30px 30px 10px 10px;
+        }
+
+        /* Flujo Sanguíneo */
+        .flow-particle {
+            position: absolute; width: 25px; height: 6px; background-color: rgba(192, 57, 43, 0.9);
+            border-radius: 5px; z-index: 10; transition: all 0.5s;
+        }
+
+        /* Panel Clínico */
+        .clinical-panel { display: flex; flex-direction: column; gap: 15px; }
+        .data-row { background: #f1f2f6; padding: 12px 15px; border-radius: 6px; border-left: 4px solid #ced6e0; }
+        .data-label { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 5px; }
+        .data-value { font-size: 15px; font-weight: bold; color: var(--primary); }
+        
+        .alert-box {
+            padding: 15px; border-radius: 6px; font-size: 14px; font-weight: bold; color: white; text-align: center;
+            animation: pulseAlert 2s infinite; margin-top: auto;
+        }
+
+        @keyframes flowAnim { 0% { left: -10%; } 100% { left: 110%; } }
+        @keyframes flowStagnant { 0% { transform: translateX(0); } 50% { transform: translateX(5px); } 100% { transform: translateX(0); } }
+        @keyframes pulseAlert { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Diagnóstico Diferencial Clínico-Anatómico</h1>
+        <p class="subtitle">Impacto Hemodinámico de la Ruptura vs. Erosión y su Manejo Farmacológico</p>
+        
+        <div class="scenario-selector">
+            <div class="btn-scenario active-rupture" id="btn-rup" onclick="setScenario('rupture')">
+                <span>Ruptura de Placa</span>
+                <small>Infarto Clásico (IAMCEST)</small>
+            </div>
+            <div class="btn-scenario" id="btn-ero" onclick="setScenario('erosion')">
+                <span>Erosión de Placa</span>
+                <small>Angina Inestable / SCASEST</small>
+            </div>
+        </div>
+
+        <div class="layout-grid">
+            <div class="simulation-area" id="sim-area">
+                <div class="vessel-wall-top"></div>
+                
+                <div class="plaque-mound" id="plaque">
+                    <div class="fibrous-cap" id="fib-cap"></div>
+                    
+                    <!-- Trombo Rojo Oclusivo -->
+                    <div class="rupture-fissure" id="fissure"></div>
+                    <div class="red-thrombus" id="red-thrombus">
+                        <div class="fibrin-mesh"></div>
+                        <!-- Células generadas por JS -->
+                        <div style="position:absolute; color:white; font-size:12px; font-weight:bold; background:rgba(0,0,0,0.7); padding:4px 8px; border-radius:4px; z-index:20; text-align:center;">Red de Fibrina<br>+ Eritrocitos</div>
+                    </div>
+
+                    <!-- Trombo Blanco Suboclusivo -->
+                    <div class="white-thrombus" id="white-thrombus">
+                        <div class="net-web" id="nets"></div>
+                        <!-- Células generadas por JS -->
+                        <div style="position:absolute; bottom:-30px; color:#2c3e50; font-size:11px; font-weight:bold; background:rgba(255,255,255,0.9); padding:4px 8px; border-radius:4px; border:1px solid #bdc3c7; z-index:20; white-space:nowrap;">Agregado Plaquetario + NETs</div>
+                    </div>
+                </div>
+
+                <div class="vessel-wall-bottom"></div>
+            </div>
+
+            <div class="clinical-panel">
+                <div class="data-row" id="row-mech">
+                    <div class="data-label">Mecanismo y Gatillo Trombogénico</div>
+                    <div class="data-value" id="val-mech"></div>
+                </div>
+                <div class="data-row" id="row-obs">
+                    <div class="data-label">Hemodinámica y Grado de Obstrucción</div>
+                    <div class="data-value" id="val-obs"></div>
+                </div>
+                <div class="data-row" id="row-epi">
+                    <div class="data-label">Perfil Epidemiológico Frecuente</div>
+                    <div class="data-value" id="val-epi"></div>
+                </div>
+                
+                <div class="alert-box" id="alert-pharma"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const btnRup = document.getElementById('btn-rup');
+        const btnEro = document.getElementById('btn-ero');
+        const simArea = document.getElementById('sim-area');
+        
+        // Elementos Visuales
+        const fibCap = document.getElementById('fib-cap');
+        const fissure = document.getElementById('fissure');
+        const redThrombus = document.getElementById('red-thrombus');
+        const whiteThrombus = document.getElementById('white-thrombus');
+        const nets = document.getElementById('nets');
+
+        // Textos del Panel
+        const valMech = document.getElementById('val-mech');
+        const valObs = document.getElementById('val-obs');
+        const valEpi = document.getElementById('val-epi');
+        const alertPharma = document.getElementById('alert-pharma');
+        const rowMech = document.getElementById('row-mech');
+
+        // Rellenar trombos con células
+        for(let i=0; i<30; i++) redThrombus.innerHTML += '<div class="rbc"></div>';
+        for(let i=0; i<45; i++) whiteThrombus.innerHTML += '<div class="platelet"></div>';
+
+        // Partículas de flujo dinámico
+        let flowParticles = [];
+        for(let i=0; i<20; i++) {
+            const p = document.createElement('div');
+            p.className = 'flow-particle';
+            simArea.appendChild(p);
+            flowParticles.push(p);
+        }
+
+        function setScenario(scenario) {
+            if (scenario === 'rupture') {
+                btnRup.className = 'btn-scenario active-rupture';
+                btnEro.className = 'btn-scenario';
+                
+                // Visuales Placa
+                fibCap.style.borderTopColor = 'var(--fibrous-thin)';
+                fibCap.style.borderTopWidth = '2px';
+                fissure.style.opacity = 1;
+                
+                // Mostrar Rojo, ocultar Blanco
+                redThrombus.style.opacity = 1;
+                whiteThrombus.style.opacity = 0;
+                nets.style.opacity = 0;
+                
+                // COMPORTAMIENTO HEMODINÁMICO: OCLUSIÓN TOTAL
+                flowParticles.forEach((p, index) => {
+                    // Se acumulan a la izquierda del trombo (antes del 35% de la pantalla)
+                    p.style.top = (Math.random() * 60 + 10) + '%'; 
+                    p.style.left = (Math.random() * 25 + 5) + '%'; 
+                    // Animación de estancamiento (pequeño latido sin avance)
+                    p.style.animation = `flowStagnant ${Math.random() * 0.5 + 0.5}s ease-in-out infinite alternate`;
+                });
+
+                // Textos Clínicos
+                rowMech.style.borderLeftColor = 'var(--danger)';
+                valMech.innerHTML = "Desgarro de cápsula fina. Exposición masiva del <strong>Factor Tisular</strong> (núcleo lipídico).";
+                valObs.innerText = "OCLUSIÓN TOTAL (Bloqueo absoluto de pared a pared).";
+                valObs.style.color = "var(--danger)";
+                valEpi.innerText = "Hombres, edad avanzada, dislipidemia severa, placas con gran núcleo necrótico.";
+                
+                alertPharma.style.backgroundColor = "var(--danger)";
+                alertPharma.innerHTML = "TERAPIA: REPERFUSIÓN URGENTE<br><span style='font-size:12px; font-weight:normal;'>Alta eficacia de fibrinolíticos (destruyen la red densa de fibrina). Angioplastia primaria de elección.</span>";
+
+            } else {
+                btnEro.className = 'btn-scenario';
+                btnEro.className = 'btn-scenario active-erosion';
+                
+                // Visuales Placa
+                fibCap.style.borderTopColor = 'var(--fibrous-thick)';
+                fibCap.style.borderTopWidth = '8px';
+                fissure.style.opacity = 0;
+                
+                // Mostrar Blanco, ocultar Rojo
+                redThrombus.style.opacity = 0;
+                whiteThrombus.style.opacity = 1;
+                nets.style.opacity = 1;
+                
+                // COMPORTAMIENTO HEMODINÁMICO: FLUJO MURAL (Pasa por arriba)
+                flowParticles.forEach((p, index) => {
+                    // El lumen superior (top: 10% a 35%) está libre. 
+                    p.style.top = (Math.random() * 25 + 10) + '%'; 
+                    // Animación de flujo continuo cruzando la pantalla
+                    p.style.animation = `flowAnim ${Math.random() * 1.5 + 1}s linear infinite`;
+                });
+
+                // Textos Clínicos
+                rowMech.style.borderLeftColor = '#8e44ad';
+                valMech.innerHTML = "Descamación endotelial. Exposición de <strong>Colágeno subendotelial y Ácido Hialurónico</strong>. Cápsula intacta.";
+                valObs.innerText = "SUBOCLUSIVO (Trombo mural). Flujo conservado, riesgo de microembolización.";
+                valObs.style.color = "#8e44ad";
+                valEpi.innerText = "Mujeres (frecuente en jóvenes/premenopáusicas), tabaquistas, placas fibrosas estables previas.";
+                
+                alertPharma.style.backgroundColor = "#8e44ad";
+                alertPharma.innerHTML = "TERAPIA: ANTIAGREGACIÓN POTENTE<br><span style='font-size:12px; font-weight:normal;'>Fibrinolíticos CONTRAINDICADOS (sin red de fibrina). Se usan Inhibidores P2Y12 o IIb-IIIa para desarmar el agregado plaquetario.</span>";
+            }
+        }
+
+        // Iniciar
+        setScenario('rupture');
+    </script>
+</body>
+</html>

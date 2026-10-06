@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Ley de Laplace y Vulnerabilidad de Placa</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --primary: #2c3e50;
+            --blood: #ffcccc;
+            --fibrous-cap: #ecf0f1;
+            --core: #d35400;
+            --smc: #2ecc71; /* Smooth Muscle Cells */
+            --macrophage: #9b59b6; /* Macrophages/MMPs */
+            --danger: #c0392b;
+            --warning: #f39c12;
+            --pressure-arrow: #2980b9;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8fa6; margin-bottom: 25px; font-size: 14px; }
+        
+        /* Controles */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            background: #f1f2f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        .slider-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 10px; color: var(--primary); font-size: 14px; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; }
+        
+        .balance-bar {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 5px; font-size: 11px; font-weight: bold;
+        }
+
+        /* Ecuación Activa */
+        .equation-box {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #e8f4f8;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+        }
+        .var-h { color: var(--warning); }
+        .var-p { color: var(--pressure-arrow); }
+        .var-t { color: var(--danger); transition: font-size 0.3s; }
+
+        /* Simulación Visual */
+        .simulation-area {
+            position: relative;
+            height: 280px;
+            background-color: var(--blood);
+            border-radius: 8px;
+            border: 2px solid #dfe6e9;
+            overflow: hidden;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        /* Flujo Sanguíneo y Presión */
+        .blood-lumen {
+            position: absolute;
+            top: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
+        .pressure-waves {
+            position: absolute;
+            bottom: 0; width: 100%; height: 100%;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            padding-bottom: 80px;
+        }
+        .wave-arrow {
+            width: 0; height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid rgba(41, 128, 185, 0.4);
+            animation: pulsePressure 1s infinite;
+            transition: all 0.3s;
+        }
+
+        /* Anatomía de la Placa */
+        .plaque-structure {
+            position: relative;
+            width: 70%;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            z-index: 5;
+        }
+        
+        /* Cápsula Fibrosa (h) */
+        .fibrous-cap {
+            width: 100%;
+            height: 30px; /* Dinámico */
+            background-color: var(--fibrous-cap);
+            border-radius: 50% 50% 0 0;
+            border-top: 3px solid #bdc3c7;
+            transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Células en la Cápsula */
+        .cap-cells {
+            position: absolute;
+            width: 100%; height: 100%;
+            display: flex; justify-content: space-around; align-items: center;
+            opacity: 0.8;
+        }
+        .cell-smc { width: 25px; height: 6px; background-color: var(--smc); border-radius: 10px; transition: opacity 0.3s; }
+        .cell-mac { width: 12px; height: 12px; background-color: var(--macrophage); border-radius: 50%; transition: opacity 0.3s; }
+
+        /* Núcleo Necrótico */
+        .necrotic-core {
+            width: 90%;
+            flex: 1;
+            background: radial-gradient(circle, #e67e22 0%, var(--core) 100%);
+            border-radius: 0 0 20px 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white; font-weight: bold; font-size: 14px; text-shadow: 1px 1px 2px black;
+        }
+        
+        /* Animación de Ruptura */
+        .rupture-crack {
+            position: absolute;
+            top: -10px; left: 45%;
+            width: 30px; height: 50px;
+            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 0 L40 30 L60 50 L45 70 L55 100" stroke="%23c0392b" stroke-width="8" fill="none"/></svg>') no-repeat center;
+            opacity: 0;
+            z-index: 20;
+        }
+        .thrombus {
+            position: absolute;
+            top: -40px; left: 40%;
+            width: 60px; height: 40px;
+            background-color: #8e44ad;
+            border-radius: 20px 30px 10px 40px;
+            opacity: 0;
+            z-index: 25;
+            box-shadow: 0 0 15px rgba(142, 68, 173, 0.8);
+        }
+
+        /* Dashboards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ced6e0; text-align: center; transition: all 0.3s; }
+        .metric-title { font-size: 11px; font-weight: bold; color: #7f8fa6; text-transform: uppercase; margin-bottom: 8px;}
+        .metric-state { font-size: 18px; font-weight: bold; color: var(--primary); }
+        
+        .explanation-box {
+            grid-column: span 4; padding: 15px; background-color: #e8f4f8;
+            border-left: 5px solid #3498db; border-radius: 4px; font-size: 14px;
+            line-height: 1.5; color: #2c3e50; margin-top: 10px;
+        }
+
+        @keyframes pulsePressure { 0% { transform: translateY(0) scale(1); opacity: 0.4; } 50% { transform: translateY(-15px) scale(1.2); opacity: 0.8; } 100% { transform: translateY(0) scale(1); opacity: 0.4; } }
+        @keyframes explode { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Ley de Laplace y Vulnerabilidad de Placa</h1>
+        <p class="subtitle">Interacción entre el Metabolismo de la Matriz Extracelular y el Estrés Parietal Dinámico</p>
+        
+        <div class="equation-box">
+            Tensión (<span class="var-t" id="eq-t">T</span>) = [ Presión (<span class="var-p">P</span>) × Radio (r) ] / [ 2 × Grosor (<span class="var-h">h</span>) ]
+        </div>
+
+        <div class="controls-grid">
+            <div class="slider-group">
+                <label>
+                    <span>Equilibrio Biológico (Síntesis vs. Degradación)</span>
+                </label>
+                <input type="range" id="sl-balance" min="0" max="100" value="20" step="1">
+                <div class="balance-bar">
+                    <span style="color: var(--smc);">CML (Colágeno)</span>
+                    <span style="color: #7f8fa6;">Equilibrio</span>
+                    <span style="color: var(--macrophage);">Macrófagos (MMPs)</span>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>Presión Transmural Sistémica (P)</span>
+                    <span id="val-pressure">Normal</span>
+                </label>
+                <input type="range" id="sl-pressure" min="1" max="3" value="1" step="0.5">
+                <div class="balance-bar">
+                    <span style="color: #7f8fa6;">Reposo/Nocturno</span>
+                    <span style="color: var(--pressure-arrow);">Pico Matutino</span>
+                    <span style="color: var(--danger);">HTA Descontrolada</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="blood-lumen"></div>
+            
+            <div class="pressure-waves" id="waves">
+                <div class="wave-arrow"></div>
+                <div class="wave-arrow"></div>
+                <div class="wave-arrow"></div>
+                <div class="wave-arrow"></div>
+                <div class="wave-arrow"></div>
+            </div>
+
+            <div class="plaque-structure">
+                <div class="fibrous-cap" id="fibrous-cap">
+                    <div class="cap-cells" id="cap-cells">
+                        <!-- Llenado por JS -->
+                    </div>
+                </div>
+                
+                <div class="rupture-crack" id="crack"></div>
+                <div class="thrombus" id="thrombus"></div>
+
+                <div class="necrotic-core">
+                    Núcleo Necrótico (Trombogénico)
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Grosor de la Cápsula (h)</div>
+                <div class="metric-state var-h" id="st-h">Gruesa</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Fuerza Radial (P)</div>
+                <div class="metric-state var-p" id="st-p">Basal</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Tensión Multiplicada (T)</div>
+                <div class="metric-state var-t" id="st-t" style="color: #2ecc71;">Baja (1.0x)</div>
+            </div>
+            <div class="metric-card" id="card-risk">
+                <div class="metric-title">Integridad Estructural</div>
+                <div class="metric-state" id="st-risk" style="color: #2ecc71;">Placa Estable</div>
+            </div>
+            
+            <div class="explanation-box" id="explanation">
+                <strong>Equilibrio Fisiológico:</strong> Las Células de Músculo Liso (CML) predominan, sintetizando colágeno y manteniendo una cápsula fibrosa gruesa ($h$ alto). La tensión tangencial es soportable.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slBalance = document.getElementById('sl-balance');
+        const slPressure = document.getElementById('sl-pressure');
+        
+        const fibrousCap = document.getElementById('fibrous-cap');
+        const capCells = document.getElementById('cap-cells');
+        const waves = document.querySelectorAll('.wave-arrow');
+        const crack = document.getElementById('crack');
+        const thrombus = document.getElementById('thrombus');
+        
+        const stH = document.getElementById('st-h');
+        const stP = document.getElementById('st-p');
+        const stT = document.getElementById('st-t');
+        const stRisk = document.getElementById('st-risk');
+        const cardRisk = document.getElementById('card-risk');
+        const explanation = document.getElementById('explanation');
+
+        function updateSimulation() {
+            const balance = parseInt(slBalance.value); // 0 (CML) a 100 (MMPs)
+            const pressure = parseFloat(slPressure.value); // 1.0 a 3.0
+
+            // 1. Lógica Biológica: Grosor (h)
+            // Disminución exponencial del grosor a medida que ganan las Metaloproteinasas
+            const maxH = 45; // pixeles
+            const minH = 4;
+            // Ecuación de decaimiento: h disminuye fuertemente si balance > 50
+            let hFactor = 1 - (Math.pow(balance / 100, 2)); 
+            let actualH = minH + (maxH - minH) * hFactor;
+            
+            fibrousCap.style.height = actualH + 'px';
+
+            // Actualizar visual de células en la cápsula
+            capCells.innerHTML = '';
+            let smcCount = Math.floor(5 * hFactor);
+            let macCount = Math.floor(5 * (1 - hFactor));
+            if(smcCount < 0) smcCount = 0;
+            
+            for(let i=0; i<smcCount; i++) capCells.innerHTML += '<div class="cell-smc"></div>';
+            for(let i=0; i<macCount; i++) capCells.innerHTML += '<div class="cell-mac"></div>';
+
+            if (actualH > 30) {
+                stH.innerText = "Gruesa ?"; stH.style.color = "#2ecc71";
+            } else if (actualH > 15) {
+                stH.innerText = "Adelgazada ?"; stH.style.color = "#f39c12";
+            } else {
+                stH.innerText = "Fina (Crítica) ??"; stH.style.color = "#c0392b";
+            }
+
+            // 2. Lógica Física: Presión (P)
+            let pLabel = "Basal";
+            if (pressure >= 2.5) { pLabel = "Severa (HTA)"; document.getElementById('val-pressure').innerText = "HTA Descontrolada"; }
+            else if (pressure >= 1.5) { pLabel = "Pico Diurno"; document.getElementById('val-pressure').innerText = "Pico Matutino"; }
+            else { document.getElementById('val-pressure').innerText = "Normal / Nocturno"; }
+            
+            stP.innerText = pLabel;
+            
+            // Animar las ondas de presión
+            waves.forEach(w => {
+                w.style.borderTopColor = `rgba(41, 128, 185, ${0.3 + (pressure * 0.2)})`;
+                w.style.borderTopWidth = (20 + (pressure * 10)) + 'px';
+                w.style.animationDuration = (1.5 / pressure) + 's';
+            });
+
+            // 3. Ecuación de Laplace (Tensión)
+            // T = P / h (Asumiendo r constante para simplificar el modelo educativo)
+            // Normalizamos para que T basal = 1.0
+            const basalH = maxH; 
+            const relativeH = actualH / basalH; // 1.0 a ~0.1
+            const tension = pressure / relativeH; 
+
+            stT.innerText = tension.toFixed(1) + "x";
+
+            // 4. Lógica de Ruptura Clínica
+            crack.style.opacity = 0;
+            thrombus.style.opacity = 0;
+            fibrousCap.style.borderTopColor = "#bdc3c7";
+            cardRisk.style.borderColor = "#ced6e0";
+            document.getElementById('eq-t').style.fontSize = "22px";
+
+            if (tension > 12) {
+                // RUPTURA AGUDA
+                stRisk.innerText = "RUPTURA Y TROMBOSIS";
+                stRisk.style.color = "#c0392b";
+                cardRisk.style.borderColor = "#c0392b";
+                crack.style.opacity = 1;
+                thrombus.style.opacity = 1;
+                document.getElementById('eq-t').style.fontSize = "32px";
+                
+                explanation.innerHTML = "<strong>EVENTO CORONARIO AGUDO:</strong> La sinergia letal se ha cumplido. Las metaloproteinasas redujeron el grosor ($h$) exponencialmente. Un pico de presión ($P$) actuó como detonador. La <strong>Tensión Tangencial ($T$)</strong> superó la resistencia biomecánica, rasgando la red de colágeno y exponiendo el núcleo trombogénico a la cascada sanguínea.";
+                explanation.style.borderLeftColor = "#c0392b";
+            } else if (tension > 6) {
+                // VULNERABLE
+                stRisk.innerText = "Altamente Vulnerable";
+                stRisk.style.color = "#e67e22";
+                cardRisk.style.borderColor = "#e67e22";
+                fibrousCap.style.borderTopColor = "#e67e22";
+                document.getElementById('eq-t').style.fontSize = "26px";
+                
+                explanation.innerHTML = "<strong>Incremento Geométrico Multiplicador:</strong> Los macrófagos predominan secretando MPM que disuelven la matriz intersticial. Al caer el grosor del denominador ($h$), la tensión se multiplica geométricamente. Cualquier pico de presión adicional fracturará la cápsula[cite: 2].";
+                explanation.style.borderLeftColor = "#e67e22";
+            } else {
+                // ESTABLE
+                stRisk.innerText = "Placa Estable";
+                stRisk.style.color = "#2ecc71";
+                
+                explanation.innerHTML = "<strong>Integridad Biomecánica:</strong> Las Células de Músculo Liso mantienen una gruesa capa de tejido extracelular. Un denominador ($h$) alto en la Ecuación de Laplace amortigua eficazmente los cambios sistémicos de presión ($P$), manteniendo estable la lesión[cite: 2].";
+                explanation.style.borderLeftColor = "#2ecc71";
+            }
+        }
+
+        slBalance.addEventListener('input', updateSimulation);
+        slPressure.addEventListener('input', updateSimulation);
+        
+        updateSimulation();
+    </script>
+</body>
+</html>
